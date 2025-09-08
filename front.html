@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Conversor de Arquivos</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'brand-green': '#B5FF81',
+                        'brand-black': '#212121',
+                        'brand-white': '#FEFEFE'
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="min-h-screen bg-brand-white">
+    <!-- Header -->
+    <header class="border-b border-gray-100">
+        <div class="max-w-6xl mx-auto px-6 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-2">
+                    <div class="w-8 h-8 bg-brand-green rounded-lg flex items-center justify-center">
+                        <svg class="w-5 h-5 text-brand-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                        </svg>
+                    </div>
+                    <span class="text-xl font-semibold text-brand-black">Converter</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-4xl mx-auto px-6 py-16">
+        <!-- Hero Section -->
+        <div class="text-center mb-12">
+            <h1 class="text-4xl font-light text-brand-black mb-4">
+                Converta seus arquivos
+            </h1>
+            <p class="text-lg text-gray-600 max-w-2xl mx-auto">
+                Transforme qualquer arquivo no formato que você precisa. 
+                Simples, rápido e seguro.
+            </p>
+        </div>
+
+        <!-- Converter Card -->
+        <div class="bg-brand-white rounded-3xl shadow-sm border border-gray-100 p-8 max-w-2xl mx-auto">
+            <!-- Upload Area -->
+            <div class="mb-8">
+                <div id="upload-area" class="relative border-2 border-dashed border-gray-200 rounded-2xl p-12 text-center cursor-pointer transition-all duration-300 hover:border-gray-300 hover:bg-gray-50">
+                    <input type="file" id="file-input" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
+                    
+                    <!-- Default State -->
+                    <div id="upload-default" class="flex flex-col items-center">
+                        <div class="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mb-4">
+                            <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                            </svg>
+                        </div>
+                        <h3 class="text-lg font-medium text-gray-700 mb-2">
+                            Clique para selecionar
+                        </h3>
+                        <p class="text-gray-500">
+                            ou arraste e solte seu arquivo aqui
+                        </p>
+                    </div>
+
+                    <!-- File Selected State -->
+                    <div id="upload-selected" class="hidden flex flex-col items-center">
+                        <div class="w-16 h-16 bg-brand-green rounded-2xl flex items-center justify-center mb-4">
+                            <svg class="w-8 h-8 text-brand-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                            </svg>
+                        </div>
+                        <h3 id="file-name" class="text-lg font-medium text-brand-black mb-1"></h3>
+                        <p id="file-size" class="text-gray-500"></p>
+                        <button id="remove-file" class="mt-3 text-gray-400 hover:text-gray-600 transition-colors">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Format Selection -->
+            <div id="format-selection" class="mb-8 hidden">
+                <label class="block text-sm font-medium text-gray-700 mb-3">
+                    Converter para:
+                </label>
+                <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    <button class="format-btn p-3 rounded-xl border border-gray-200 text-sm font-medium transition-all duration-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50" data-format="pdf">PDF</button>
+                    <button class="format-btn p-3 rounded-xl border border-gray-200 text-sm font-medium transition-all duration-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50" data-format="docx">Word Document</button>
+                    <button class="format-btn p-3 rounded-xl border border-gray-200 text-sm font-medium transition-all duration-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50" data-format="jpg">JPEG Image</button>
+                    <button class="format-btn p-3 rounded-xl border border-gray-200 text-sm font-medium transition-all duration-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50" data-format="png">PNG Image</button>
+                    <button class="format-btn p-3 rounded-xl border border-gray-200 text-sm font-medium transition-all duration-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50" data-format="mp4">MP4 Video</button>
+                    <button class="format-btn p-3 rounded-xl border border-gray-200 text-sm font-medium transition-all duration-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50" data-format="mp3">MP3 Audio</button>
+                </div>
+            </div>
+
+            <!-- Cover Form -->
+            <div id="cover-form" class="mb-8 hidden max-w-xl mx-auto">
+                <label class="block text-sm font-medium text-gray-700 mb-3">Informações da capa</label>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                    <div class="md:col-span-2">
+                        <label class="block text-xs text-gray-600 mb-1">Subtítulo (abaixo de ‘Relatório’)</label>
+                        <input id="cover_subtitulo" type="text" class="w-full border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-green" placeholder="Avanço da integração de IA da ZOI">
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-xs text-gray-600 mb-1">Descrição</label>
+                        <textarea id="cover_descricao" rows="3" class="w-full border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-green" placeholder="Breve descrição do documento..."></textarea>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-600 mb-1">Preparado por (nome)</label>
+                        <input id="cover_prep_nome" type="text" class="w-full border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-green" placeholder="Seu nome">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-600 mb-1">Email</label>
+                        <input id="cover_prep_email" type="email" class="w-full border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-green" placeholder="email@exemplo.com">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-600 mb-1">Telefone</label>
+                        <input id="cover_prep_phone" type="text" class="w-full border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-green" placeholder="+55 (47) 99999-9999">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-600 mb-1">Data</label>
+                        <input id="cover_data" type="date" class="w-full border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-green">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Progress Bar -->
+            <div id="progress-section" class="mb-8 hidden">
+                <div class="flex items-center justify-between mb-2">
+                    <span id="progress-text" class="text-sm font-medium text-gray-700">Convertendo...</span>
+                    <span id="progress-percent" class="text-sm text-gray-500">0%</span>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-2">
+                    <div id="progress-bar" class="bg-brand-green h-2 rounded-full transition-all duration-300 ease-out" style="width: 0%"></div>
+                </div>
+            </div>
+            <!-- Preview -->
+            <div id="preview-section" class="mb-8 hidden">
+                <label class="block text-sm font-medium text-gray-700 mb-3">Pré‑visualização</label>
+                <div class="border border-gray-200 rounded-xl overflow-hidden shadow-sm" style="height: 70vh;">
+                    <iframe id="preview-frame" class="w-full h-full" frameborder="0"></iframe>
+                </div>
+                <p class="text-xs text-gray-500 mt-2">Se o preview não aparecer, o download ainda funcionará normalmente.</p>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex flex-col sm:flex-row gap-3">
+                <!-- Convert Button -->
+                <button id="convert-btn" class="w-full py-3 px-6 rounded-xl font-medium transition-all duration-200 bg-gray-200 text-gray-400 cursor-not-allowed">
+                    Converter arquivo
+                </button>
+
+                <!-- Download & New File Buttons -->
+                <div id="success-buttons" class="hidden flex flex-col sm:flex-row gap-3 w-full">
+                    <a id="download-btn" href="#" download class="flex-1 bg-brand-green text-brand-black py-3 px-6 rounded-xl font-medium hover:opacity-90 transition-all duration-200 flex items-center justify-center space-x-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
+                        </svg>
+                        <span>Download</span>
+                    </a>
+                    <button id="new-file-btn" class="flex-1 bg-gray-100 text-gray-700 py-3 px-6 rounded-xl font-medium hover:bg-gray-200 transition-colors duration-200">
+                        Novo arquivo
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Features Section -->
+        <div class="grid md:grid-cols-3 gap-8 mt-16">
+            <div class="text-center">
+                <div class="w-12 h-12 bg-green-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                    <svg class="w-6 h-6 text-brand-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                    </svg>
+                </div>
+                <h3 class="font-medium text-brand-black mb-2">Simples</h3>
+                <p class="text-gray-600 text-sm">Interface intuitiva e fácil de usar</p>
+            </div>
+            
+            <div class="text-center">
+                <div class="w-12 h-12 bg-green-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                    <svg class="w-6 h-6 text-brand-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                    </svg>
+                </div>
+                <h3 class="font-medium text-brand-black mb-2">Rápido</h3>
+                <p class="text-gray-600 text-sm">Conversões em segundos</p>
+            </div>
+            
+            <div class="text-center">
+                <div class="w-12 h-12 bg-green-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                    <svg class="w-6 h-6 text-brand-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                </div>
+                <h3 class="font-medium text-brand-black mb-2">Seguro</h3>
+                <p class="text-gray-600 text-sm">Seus arquivos são protegidos</p>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        (function() {
+            const uploadArea = document.getElementById('upload-area');
+            const fileInput = document.getElementById('file-input');
+            const uploadDefault = document.getElementById('upload-default');
+            const uploadSelected = document.getElementById('upload-selected');
+            const fileNameEl = document.getElementById('file-name');
+            const fileSizeEl = document.getElementById('file-size');
+            const removeFileBtn = document.getElementById('remove-file');
+            const formatSelection = document.getElementById('format-selection');
+            const formatBtns = document.querySelectorAll('.format-btn');
+            const convertBtn = document.getElementById('convert-btn');
+            const progressSection = document.getElementById('progress-section');
+            const progressText = document.getElementById('progress-text');
+            const progressPercent = document.getElementById('progress-percent');
+            const progressBar = document.getElementById('progress-bar');
+            const successButtons = document.getElementById('success-buttons');
+            const downloadBtn = document.getElementById('download-btn');
+            const newFileBtn = document.getElementById('new-file-btn');
+            const coverForm = document.getElementById('cover-form');
+            const previewSection = document.getElementById('preview-section');
+            const previewFrame = document.getElementById('preview-frame');
+            const getVal = (id, defVal='') => {
+                const el = document.getElementById(id);
+                return el && 'value' in el ? el.value : defVal;
+            };
+
+            let selectedFile = null;
+            let selectedFormat = 'pdf';
+            let downloadUrl = null;
+
+            function humanSize(bytes) {
+                const units = ['B','KB','MB','GB'];
+                let i = 0;
+                while (bytes >= 1024 && i < units.length-1) { bytes /= 1024; i++; }
+                return `${bytes.toFixed(1)} ${units[i]}`;
+            }
+
+            function setConvertEnabled(enabled) {
+                if (enabled) {
+                    convertBtn.classList.remove('bg-gray-200','text-gray-400','cursor-not-allowed');
+                    convertBtn.classList.add('bg-brand-green','text-brand-black','hover:opacity-90');
+                } else {
+                    convertBtn.classList.add('bg-gray-200','text-gray-400','cursor-not-allowed');
+                    convertBtn.classList.remove('bg-brand-green','text-brand-black','hover:opacity-90');
+                }
+                convertBtn.disabled = !enabled;
+            }
+
+            function resetAll() {
+                selectedFile = null;
+                if (downloadUrl) { URL.revokeObjectURL(downloadUrl); downloadUrl = null; }
+                uploadDefault.classList.remove('hidden');
+                uploadSelected.classList.add('hidden');
+                fileInput.value = '';
+                if (formatSelection) formatSelection.classList.add('hidden');
+                if (coverForm) coverForm.classList.add('hidden');
+                progressSection.classList.add('hidden');
+                if (previewSection) previewSection.classList.add('hidden');
+                if (previewFrame) previewFrame.removeAttribute('src');
+                successButtons.classList.add('hidden');
+                convertBtn.classList.remove('hidden');
+                setConvertEnabled(false);
+                formatBtns.forEach(btn => btn.classList.remove('bg-brand-green','text-brand-black'));
+            }
+
+            function setFile(file) {
+                selectedFile = file;
+                fileNameEl.textContent = file.name;
+                fileSizeEl.textContent = humanSize(file.size);
+                uploadDefault.classList.add('hidden');
+                uploadSelected.classList.remove('hidden');
+                if (formatSelection) formatSelection.classList.remove('hidden');
+                if (coverForm) coverForm.classList.remove('hidden');
+                setConvertEnabled(selectedFormat === 'pdf' && !!selectedFile);
+            }
+
+            // Upload area interactions
+            uploadArea.addEventListener('click', () => fileInput.click());
+            uploadArea.addEventListener('dragover', (e) => { e.preventDefault(); uploadArea.classList.add('bg-gray-50'); });
+            uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('bg-gray-50'));
+            uploadArea.addEventListener('drop', (e) => {
+                e.preventDefault(); uploadArea.classList.remove('bg-gray-50');
+                if (e.dataTransfer.files && e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]);
+            });
+            fileInput.addEventListener('change', () => { if (fileInput.files[0]) setFile(fileInput.files[0]); });
+            removeFileBtn.addEventListener('click', (e) => { e.stopPropagation(); resetAll(); });
+
+            // Format selection
+            formatBtns.forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    formatBtns.forEach(b => b.classList.remove('bg-brand-green','text-brand-black'));
+                    btn.classList.add('bg-brand-green','text-brand-black');
+                    selectedFormat = btn.dataset.format;
+                    setConvertEnabled(selectedFormat === 'pdf' && !!selectedFile);
+                    if (selectedFormat !== 'pdf') {
+                        setTimeout(() => alert('Atualmente suportamos apenas PDF.'), 10);
+                    }
+                });
+            });
+
+            // Convert
+            convertBtn.addEventListener('click', () => {
+                if (!selectedFile || selectedFormat !== 'pdf' || convertBtn.disabled) return;
+
+                progressSection.classList.remove('hidden');
+                progressText.textContent = 'Convertendo...';
+                progressPercent.textContent = '0%';
+                progressBar.style.width = '0%';
+
+                const form = new FormData();
+                form.append('file', selectedFile);
+                // Cover data (ids podem ter sido removidos; usa defaults quando ausentes)
+                form.append('cover_top_email', getVal('cover_top_email', ''));
+                form.append('cover_top_site', getVal('cover_top_site', ''));
+                form.append('cover_rep_label', getVal('cover_rep_label', ''));
+                form.append('cover_rep_nome', getVal('cover_rep_nome', ''));
+                form.append('cover_subtitulo', getVal('cover_subtitulo', ''));
+                form.append('cover_descricao', getVal('cover_descricao', ''));
+                form.append('cover_prep_nome', getVal('cover_prep_nome', ''));
+                form.append('cover_prep_email', getVal('cover_prep_email', ''));
+                form.append('cover_prep_phone', getVal('cover_prep_phone', ''));
+                form.append('cover_data', getVal('cover_data', ''));
+
+                const xhr = new XMLHttpRequest();
+                xhr.open('POST', '/convert-md', true);
+                xhr.responseType = 'blob';
+
+                xhr.upload.onprogress = (e) => {
+                    if (e.lengthComputable) {
+                        const p = Math.round((e.loaded / e.total) * 60);
+                        progressPercent.textContent = p + '%';
+                        progressBar.style.width = p + '%';
+                    }
+                };
+
+                xhr.onreadystatechange = function() {
+                    if (xhr.readyState === 4) {
+                        if (xhr.status === 200) {
+                            progressPercent.textContent = '100%';
+                            progressBar.style.width = '100%';
+                            const blob = xhr.response;
+                            if (downloadUrl) { URL.revokeObjectURL(downloadUrl); }
+                            downloadUrl = URL.createObjectURL(blob);
+                            if (previewFrame) previewFrame.src = downloadUrl;
+                            if (previewSection) previewSection.classList.remove('hidden');
+                            downloadBtn.href = downloadUrl;
+                            const outName = (selectedFile.name.replace(/\.[^/.]+$/, '') || 'documento') + '.pdf';
+                            downloadBtn.setAttribute('download', outName);
+                            successButtons.classList.remove('hidden');
+                            convertBtn.classList.add('hidden');
+                            progressSection.classList.add('hidden');
+                        } else {
+                            alert('Erro ao converter o arquivo.');
+                            progressSection.classList.add('hidden');
+                        }
+                    }
+                };
+
+                xhr.onerror = () => {
+                    alert('Falha de rede durante a conversão.');
+                    progressSection.classList.add('hidden');
+                };
+
+                xhr.send(form);
+            });
+
+            // New file
+            newFileBtn.addEventListener('click', (e) => { e.preventDefault(); resetAll(); });
+
+            // Initialize
+            resetAll();
+        })();
+    </script>
+</body>
+</html>
