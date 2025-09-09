@@ -14,6 +14,7 @@ WORKDIR /app
 # Instalar dependências Python com versões fixas
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -U pip && \
+    (apt-get remove -y python3-pydyf || true) && \
     pip install --no-cache-dir -r requirements.txt
 
 # Copiar o código da aplicação

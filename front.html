@@ -365,7 +365,23 @@
                             convertBtn.classList.add('hidden');
                             progressSection.classList.add('hidden');
                         } else {
-                            alert('Erro ao converter o arquivo.');
+                            const ct = xhr.getResponseHeader('Content-Type') || '';
+                            if (ct.includes('application/json') && xhr.response) {
+                                const reader = new FileReader();
+                                reader.onload = () => {
+                                    try {
+                                        const text = reader.result || '';
+                                        const data = JSON.parse(text);
+                                        alert('Erro: ' + (data.error || 'Falha na conversão'));
+                                        console.error('Traceback:', data.traceback || '(sem traceback)');
+                                    } catch(e) {
+                                        alert('Erro na conversão (500).');
+                                    }
+                                };
+                                reader.readAsText(xhr.response);
+                            } else {
+                                alert('Erro na conversão (HTTP ' + xhr.status + ').');
+                            }
                             progressSection.classList.add('hidden');
                         }
                     }

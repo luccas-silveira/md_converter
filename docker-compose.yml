@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   md-converter:
     build: .
@@ -11,4 +9,3 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
     restart: unless-stopped
-
