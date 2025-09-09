@@ -1,32 +1,26 @@
-# Use Python 3.11 slim image
 FROM python:3.11-slim
 
-# Install system dependencies for WeasyPrint
-RUN apt-get update && apt-get install -y \
-    libcairo2 \
-    libpango-1.0-0 \
-    libpangocairo-1.0-0 \
-    libgdk-pixbuf-2.0-0 \
-    libffi-dev \
-    shared-mime-info \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
 
-# Set working directory
+# Dependências nativas do WeasyPrint
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libcairo2 libpango-1.0-0 libpangocairo-1.0-0 libgdk-pixbuf2.0-0 \
+    shared-mime-info fonts-dejavu-core \
+  && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
-# Copy requirements and install Python dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Instalar dependências Python com versões fixas
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -U pip && \
+    pip install --no-cache-dir -r requirements.txt
 
-# Copy application files
+# Copiar o código da aplicação
 COPY . .
 
-# Create uploads directory
-RUN mkdir -p /app/uploads
-
-# Expose port
 EXPOSE 5000
 
-# Run with gunicorn for production
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "--timeout", "120", "server:app"]
+# Gunicorn em produção
+CMD ["gunicorn", "-b", "0.0.0.0:5000", "server:app", "--workers", "2", "--timeout", "120"]
+
