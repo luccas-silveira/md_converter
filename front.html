@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Conversor de Arquivos</title>
+    <title>MD para PDF</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -30,7 +30,7 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                         </svg>
                     </div>
-                    <span class="text-xl font-semibold text-brand-black">Converter</span>
+                    <span class="text-xl font-semibold text-brand-black">MD para PDF</span>
                 </div>
             </div>
         </div>
@@ -41,11 +41,10 @@
         <!-- Hero Section -->
         <div class="text-center mb-12">
             <h1 class="text-4xl font-light text-brand-black mb-4">
-                Converta seus arquivos
+                Gere seu PDF
             </h1>
             <p class="text-lg text-gray-600 max-w-2xl mx-auto">
-                Transforme qualquer arquivo no formato que você precisa. 
-                Simples, rápido e seguro.
+                Transforme qualquer arquivo .md em um documento padrão ZOI
             </p>
         </div>
 
@@ -89,26 +88,12 @@
                 </div>
             </div>
 
-            <!-- Format Selection -->
-            <div id="format-selection" class="mb-8 hidden">
-                <label class="block text-sm font-medium text-gray-700 mb-3">
-                    Converter para:
-                </label>
-                <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    <button class="format-btn p-3 rounded-xl border border-gray-200 text-sm font-medium transition-all duration-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50" data-format="pdf">PDF</button>
-                    <button class="format-btn p-3 rounded-xl border border-gray-200 text-sm font-medium transition-all duration-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50" data-format="docx">Word Document</button>
-                    <button class="format-btn p-3 rounded-xl border border-gray-200 text-sm font-medium transition-all duration-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50" data-format="jpg">JPEG Image</button>
-                    <button class="format-btn p-3 rounded-xl border border-gray-200 text-sm font-medium transition-all duration-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50" data-format="png">PNG Image</button>
-                    <button class="format-btn p-3 rounded-xl border border-gray-200 text-sm font-medium transition-all duration-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50" data-format="mp4">MP4 Video</button>
-                    <button class="format-btn p-3 rounded-xl border border-gray-200 text-sm font-medium transition-all duration-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50" data-format="mp3">MP3 Audio</button>
-                </div>
-            </div>
+            <!-- Format Selection removed: always PDF -->
 
             <!-- Cover Form -->
-            <div id="cover-form" class="mb-8 hidden max-w-xl mx-auto">
+            <div id="cover-form" class="mb-8 hidden w-full">
                 <label class="block text-sm font-medium text-gray-700 mb-3">Informações da capa</label>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
                     <div class="md:col-span-2">
                         <label class="block text-xs text-gray-600 mb-1">Subtítulo (abaixo de ‘Relatório’)</label>
                         <input id="cover_subtitulo" type="text" class="w-full border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-green" placeholder="Avanço da integração de IA da ZOI">
@@ -139,27 +124,20 @@
             <!-- Progress Bar -->
             <div id="progress-section" class="mb-8 hidden">
                 <div class="flex items-center justify-between mb-2">
-                    <span id="progress-text" class="text-sm font-medium text-gray-700">Convertendo...</span>
+                    <span id="progress-text" class="text-sm font-medium text-gray-700">Gerando PDF...</span>
                     <span id="progress-percent" class="text-sm text-gray-500">0%</span>
                 </div>
                 <div class="w-full bg-gray-200 rounded-full h-2">
                     <div id="progress-bar" class="bg-brand-green h-2 rounded-full transition-all duration-300 ease-out" style="width: 0%"></div>
                 </div>
             </div>
-            <!-- Preview -->
-            <div id="preview-section" class="mb-8 hidden">
-                <label class="block text-sm font-medium text-gray-700 mb-3">Pré‑visualização</label>
-                <div class="border border-gray-200 rounded-xl overflow-hidden shadow-sm" style="height: 70vh;">
-                    <iframe id="preview-frame" class="w-full h-full" frameborder="0"></iframe>
-                </div>
-                <p class="text-xs text-gray-500 mt-2">Se o preview não aparecer, o download ainda funcionará normalmente.</p>
-            </div>
+            <!-- Preview removido: download automático após gerar PDF -->
 
             <!-- Action Buttons -->
             <div class="flex flex-col sm:flex-row gap-3">
                 <!-- Convert Button -->
                 <button id="convert-btn" class="w-full py-3 px-6 rounded-xl font-medium transition-all duration-200 bg-gray-200 text-gray-400 cursor-not-allowed">
-                    Converter arquivo
+                    Gerar PDF
                 </button>
 
                 <!-- Download & New File Buttons -->
@@ -175,40 +153,6 @@
                     </button>
                 </div>
             </div>
-        </div>
-
-        <!-- Features Section -->
-        <div class="grid md:grid-cols-3 gap-8 mt-16">
-            <div class="text-center">
-                <div class="w-12 h-12 bg-green-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                    <svg class="w-6 h-6 text-brand-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
-                    </svg>
-                </div>
-                <h3 class="font-medium text-brand-black mb-2">Simples</h3>
-                <p class="text-gray-600 text-sm">Interface intuitiva e fácil de usar</p>
-            </div>
-            
-            <div class="text-center">
-                <div class="w-12 h-12 bg-green-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                    <svg class="w-6 h-6 text-brand-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
-                    </svg>
-                </div>
-                <h3 class="font-medium text-brand-black mb-2">Rápido</h3>
-                <p class="text-gray-600 text-sm">Conversões em segundos</p>
-            </div>
-            
-            <div class="text-center">
-                <div class="w-12 h-12 bg-green-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                    <svg class="w-6 h-6 text-brand-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                    </svg>
-                </div>
-                <h3 class="font-medium text-brand-black mb-2">Seguro</h3>
-                <p class="text-gray-600 text-sm">Seus arquivos são protegidos</p>
-            </div>
-        </div>
     </main>
 
     <script>
@@ -220,8 +164,7 @@
             const fileNameEl = document.getElementById('file-name');
             const fileSizeEl = document.getElementById('file-size');
             const removeFileBtn = document.getElementById('remove-file');
-            const formatSelection = document.getElementById('format-selection');
-            const formatBtns = document.querySelectorAll('.format-btn');
+            // Format selection removido: sempre PDF
             const convertBtn = document.getElementById('convert-btn');
             const progressSection = document.getElementById('progress-section');
             const progressText = document.getElementById('progress-text');
@@ -231,15 +174,13 @@
             const downloadBtn = document.getElementById('download-btn');
             const newFileBtn = document.getElementById('new-file-btn');
             const coverForm = document.getElementById('cover-form');
-            const previewSection = document.getElementById('preview-section');
-            const previewFrame = document.getElementById('preview-frame');
             const getVal = (id, defVal='') => {
                 const el = document.getElementById(id);
                 return el && 'value' in el ? el.value : defVal;
             };
 
             let selectedFile = null;
-            let selectedFormat = 'pdf';
+            // Sempre PDF
             let downloadUrl = null;
 
             function humanSize(bytes) {
@@ -266,15 +207,14 @@
                 uploadDefault.classList.remove('hidden');
                 uploadSelected.classList.add('hidden');
                 fileInput.value = '';
-                if (formatSelection) formatSelection.classList.add('hidden');
+                // Sem seleção de formato
                 if (coverForm) coverForm.classList.add('hidden');
                 progressSection.classList.add('hidden');
-                if (previewSection) previewSection.classList.add('hidden');
-                if (previewFrame) previewFrame.removeAttribute('src');
+                // Preview removido
                 successButtons.classList.add('hidden');
                 convertBtn.classList.remove('hidden');
                 setConvertEnabled(false);
-                formatBtns.forEach(btn => btn.classList.remove('bg-brand-green','text-brand-black'));
+                // Sem botões de formato
             }
 
             function setFile(file) {
@@ -283,9 +223,8 @@
                 fileSizeEl.textContent = humanSize(file.size);
                 uploadDefault.classList.add('hidden');
                 uploadSelected.classList.remove('hidden');
-                if (formatSelection) formatSelection.classList.remove('hidden');
                 if (coverForm) coverForm.classList.remove('hidden');
-                setConvertEnabled(selectedFormat === 'pdf' && !!selectedFile);
+                setConvertEnabled(!!selectedFile);
             }
 
             // Upload area interactions
@@ -299,26 +238,14 @@
             fileInput.addEventListener('change', () => { if (fileInput.files[0]) setFile(fileInput.files[0]); });
             removeFileBtn.addEventListener('click', (e) => { e.stopPropagation(); resetAll(); });
 
-            // Format selection
-            formatBtns.forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    formatBtns.forEach(b => b.classList.remove('bg-brand-green','text-brand-black'));
-                    btn.classList.add('bg-brand-green','text-brand-black');
-                    selectedFormat = btn.dataset.format;
-                    setConvertEnabled(selectedFormat === 'pdf' && !!selectedFile);
-                    if (selectedFormat !== 'pdf') {
-                        setTimeout(() => alert('Atualmente suportamos apenas PDF.'), 10);
-                    }
-                });
-            });
+            // Nenhuma seleção de formato (fixo em PDF)
 
             // Convert
             convertBtn.addEventListener('click', () => {
-                if (!selectedFile || selectedFormat !== 'pdf' || convertBtn.disabled) return;
+                if (!selectedFile || convertBtn.disabled) return;
 
                 progressSection.classList.remove('hidden');
-                progressText.textContent = 'Convertendo...';
+                progressText.textContent = 'Gerando PDF...';
                 progressPercent.textContent = '0%';
                 progressBar.style.width = '0%';
 
@@ -356,11 +283,16 @@
                             const blob = xhr.response;
                             if (downloadUrl) { URL.revokeObjectURL(downloadUrl); }
                             downloadUrl = URL.createObjectURL(blob);
-                            if (previewFrame) previewFrame.src = downloadUrl;
-                            if (previewSection) previewSection.classList.remove('hidden');
                             downloadBtn.href = downloadUrl;
                             const outName = (selectedFile.name.replace(/\.[^/.]+$/, '') || 'documento') + '.pdf';
                             downloadBtn.setAttribute('download', outName);
+                            // Dispara download automático
+                            const tempLink = document.createElement('a');
+                            tempLink.href = downloadUrl;
+                            tempLink.download = outName;
+                            document.body.appendChild(tempLink);
+                            tempLink.click();
+                            tempLink.remove();
                             successButtons.classList.remove('hidden');
                             convertBtn.classList.add('hidden');
                             progressSection.classList.add('hidden');
