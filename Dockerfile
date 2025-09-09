@@ -3,24 +3,32 @@ FROM python:3.11-slim
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
-# Dependências nativas do WeasyPrint
+# Dependências do sistema para WeasyPrint
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libcairo2 libpango-1.0-0 libpangocairo-1.0-0 libgdk-pixbuf-2.0-0 \
-    shared-mime-info fonts-dejavu-core \
+    libcairo2-dev \
+    libpango-1.0-0 \
+    libpangocairo-1.0-0 \
+    libgdk-pixbuf-2.0-0 \
+    libffi-dev \
+    shared-mime-info \
+    fonts-dejavu-core \
+    build-essential \
+    pkg-config \
   && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Instalar dependências Python com versões fixas
+# Copiar e instalar dependências primeiro
 COPY requirements.txt ./
-RUN pip install --no-cache-dir -U pip && \
-    (apt-get remove -y python3-pydyf || true) && \
+
+# Atualizar pip e instalar dependências com versões específicas
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
     pip install --no-cache-dir -r requirements.txt
 
-# Copiar o código da aplicação
+# Copiar código da aplicação
 COPY . .
 
 EXPOSE 5000
 
-# Gunicorn em produção
-CMD ["gunicorn", "-b", "0.0.0.0:5000", "server:app", "--workers", "2", "--timeout", "120"]
+# Usar gunicorn em produção
+CMD ["gunicorn", "-b", "0.0.0.0:5000", "server:app", "--workers", "2", "--timeout", "120", "--preload"]
