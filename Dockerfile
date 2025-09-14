@@ -32,4 +32,4 @@ COPY . .
 EXPOSE 5000
 
 # Usar gunicorn em produção
-CMD ["gunicorn", "-b", "0.0.0.0:5000", "app:app", "--workers", "2", "--timeout", "300", "--preload", "--access-logfile", "-", "--error-logfile", "-"]
+CMD ["gunicorn", "-b", "0.0.0.0:5000", "server:app", "--workers", "2", "--timeout", "300", "--preload", "--access-logfile", "-", "--error-logfile", "-"]
