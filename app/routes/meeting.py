@@ -9,7 +9,6 @@ import traceback
 import logging
 import uuid
 import whisper
-import openai
 from openai import OpenAI
 import os
 

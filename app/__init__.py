@@ -21,13 +21,20 @@ def create_app():
     # Registrar blueprints/rotas
     from app.routes.main import main_bp
     from app.routes.conversion import conversion_bp
-    from app.routes.meeting import meeting_bp
     from app.routes.progress import progress_bp
 
     app.register_blueprint(main_bp)
     app.register_blueprint(conversion_bp)
-    app.register_blueprint(meeting_bp)
     app.register_blueprint(progress_bp)
+
+    # Importar módulo de reunião condicionalmente
+    try:
+        from app.routes.meeting import meeting_bp
+        app.register_blueprint(meeting_bp)
+        print("✓ Módulo de reunião carregado com sucesso")
+    except Exception as e:
+        print(f"⚠️  Módulo de reunião não carregado: {e}")
+        print("   A aplicação continuará funcionando sem recursos de IA")
 
     # Error handlers
     @app.errorhandler(413)
