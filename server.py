@@ -21,6 +21,12 @@ app = create_app()
 logger.info(f"Application starting with log level: {log_level}")
 logger.info(f"Flask environment: {os.environ.get('FLASK_ENV', 'development')}")
 
+# Debug: Listar todas as rotas registradas
+logger.info("=== ROTAS REGISTRADAS ===")
+for rule in app.url_map.iter_rules():
+    logger.info(f"Route: {rule.rule} | Methods: {list(rule.methods)} | Endpoint: {rule.endpoint}")
+logger.info("=========================")
+
 if __name__ == "__main__":
     # Flask dev server (apenas para desenvolvimento)
     debug_mode = os.environ.get('FLASK_DEBUG', '1') == '1'
