@@ -1,193 +1,59 @@
-# Guia de Deploy - MDconverter
+# Deploy Único (Completo, com IA)
 
-## Pré-requisitos
-
-### Ambiente de Produção:
-- Docker e Docker Compose instalados
-- Chave OpenAI API (para resumos de reunião)
-- Mínimo 2GB de RAM disponível
-- Mínimo 1 CPU core
+## Pré‑requisitos
+- Docker e Docker Compose v2 (plugin). Verifique com: `docker compose version`
+- Chave OpenAI (`OPENAI_API_KEY`)
+- VPS com 4GB+ RAM recomendado (para Whisper/Torch)
 
 ## Configuração
-
-### 1. Configurar Variáveis de Ambiente
-
-Copie e configure o arquivo de produção:
+1) Criar `.env` a partir do exemplo:
 ```bash
-cp .env.production .env
+cp .env.example .env
+```
+Edite no `.env`:
+- `SECRET_KEY`: string aleatória segura (gere com `python -c "import secrets; print(secrets.token_urlsafe(32))"`)
+- `OPENAI_API_KEY`: sua chave
+- Opcional: `WHISPER_MODEL=tiny|small|base` (use `tiny` em VPS modesta)
+
+2) Build e subir (porta 8080):
+```bash
+docker compose up -d --build
 ```
 
-**IMPORTANTE**: Edite o `.env` e configure:
-- `SECRET_KEY`: Uma string aleatória segura
-- `OPENAI_API_KEY`: Sua chave da API OpenAI
- - `OPENAI_MODEL` (opcional): modelo da OpenAI para resumo. Padrão: `gpt-4o-mini`
- - `WHISPER_MODEL` (opcional): modelo do Whisper. Padrão: `base` (recomendado `tiny`/`small` em VPS)
-
-### 2. Gerar SECRET_KEY Segura
-
+3) Verificar e logs:
 ```bash
-python -c "import secrets; print(secrets.token_urlsafe(32))"
-```
-
-### 3. Build da Aplicação
-
-```bash
-docker-compose build
-```
-
-## Deploy
-
-### Deploy Local/Desenvolvimento:
-```bash
-docker-compose up -d
-```
-
-### Deploy Produção:
-```bash
-# Usar arquivo de ambiente específico
-docker-compose --env-file .env.production up -d
-```
-
-### Verificar Status:
-```bash
-# Ver logs
-docker-compose logs -f
-
-# Health check (endpoint dedicado)
 curl http://localhost:8080/relatorio/healthz
-
-# Status dos containers
-docker-compose ps
+docker compose logs -f md-converter
 ```
 
-## Configurações de Produção
+4) Acessar a aplicação:
+- http://SEU_IP:8080/relatorio/
 
-### Recursos (serviço padrão):
-- **Memória**: 2GB (ajustável no compose)
-- **CPU**: 1 core (ajustável)
-- **Timeout**: 5 minutos para uploads grandes
-- **Workers/Threads**: por padrão `WORKERS=1`, `THREADS=2` (ajustável via env)
+## Produção
+- `WORKERS=1`, `THREADS=2` (default): bom começo para 4GB RAM
+- `TIMEOUT=600` recomendado para uploads grandes
+- `UPLOAD_FOLDER=/data/uploads` (volume persistente já montado no compose)
+- Healthcheck: `GET /relatorio/healthz`
 
-### Limites:
-- **Upload máximo**: 100MB
-- **Formatos suportados**:
-  - Reuniões: MP3, MP4, WAV, AVI, MOV, TXT, MD
-  - Markdown: MD, TXT
-
-### Health Checks:
-- Endpoint: `GET /relatorio/healthz`
-- Intervalo: 30 segundos
-- Timeout: 10 segundos
-- Retries: 3 tentativas
-
-## URLs
-
-- **Aplicação**: http://localhost:8080
-- **Health Check**: http://localhost:8080/relatorio/healthz
-
-## Troubleshooting
-
-### Container não inicia:
+## Operação
+Atualizar código e reiniciar:
 ```bash
-# Ver logs detalhados
-docker-compose logs md-converter
-
-# Verificar health check
-docker-compose exec md-converter python health_check.py
-```
-
-### Erro de memória:
-- Aumente o limite de memória no docker-compose.yml
-- Reduza o número de workers Gunicorn
-
-### Erro de API OpenAI:
-- Verifique se a chave está correta no .env
-- Confirme que a chave tem créditos disponíveis
-
-### Upload falha:
-- Verifique o tamanho do arquivo (máx 100MB)
-- Confirme que o formato é suportado
-
-## Backup
-
-### Logs:
-```bash
-docker-compose logs md-converter > backup-logs.txt
-```
-
-### Configurações:
-Faça backup dos arquivos:
-- `.env`
-- `docker-compose.yml`
-- `prompts/prompt_resumo.md`
-
-## Atualizações
-
-```bash
-# Parar aplicação
-docker-compose down
-
-# Atualizar código
 git pull
-
-# Rebuild e restart
-docker-compose build
-docker-compose up -d
+docker compose up -d --build
 ```
 
-## IA Opcional (serviço separado)
-
-Para usar recursos de resumo de reunião (Whisper/Torch), suba o serviço opcional com perfil `ai`:
-
+Logs e monitoramento:
 ```bash
-# Sobe o serviço padrão + serviço de IA
-docker compose --profile ai up -d
-
-# O serviço de IA expõe por padrão http://localhost:8081
-# Ajuste portas/recursos no docker-compose.yml conforme necessário
-```
-
-Requisitos adicionais:
-- Mais memória (recomendado 4GB+ para Whisper/Torch)
-- `ffmpeg` já incluso no Dockerfile.ai
-- Defina `WHISPER_MODEL=tiny` ou `small` se sua VPS for limitada em CPU/RAM
-
-## Volumes e Uploads
-
-- O diretório de uploads na produção é configurável via `UPLOAD_FOLDER` (default: `/data/uploads`).
-- O `docker-compose.yml` já cria e monta o volume `uploads:/data/uploads`.
-
-## Reverse Proxy e SSE (progresso)
-
-Se estiver atrás de Nginx/Caddy, desabilite buffering para SSE:
-
-Nginx (exemplo):
-```nginx
-location /relatorio/ {
-  proxy_pass http://127.0.0.1:8080;
-  proxy_http_version 1.1;
-  proxy_set_header Connection "";
-  proxy_buffering off;
-  proxy_read_timeout 360s;
-}
-```
-
-## Monitoramento
-
-### Métricas importantes:
-- Uso de memória (máx 2GB)
-- Tempo de resposta health check
-- Logs de erro
-- Taxa de upload bem-sucedidos
-
-### Comandos úteis:
-```bash
-# Monitor em tempo real
+docker compose logs -f md-converter
 docker stats md-converter
-
-# Logs filtrados por erro
-docker-compose logs md-converter | grep ERROR
-
-# Reiniciar se necessário
-docker-compose restart md-converter
 ```
+
+## Firewall (Ubuntu)
+```bash
+sudo ufw allow 8080/tcp
+```
+
+## Problemas comuns
+- Torch/Whisper pesados: use `WHISPER_MODEL=tiny` no `.env`.
+- Falha no healthcheck: confira `docker compose logs -f` e `curl http://localhost:8080/relatorio/healthz`.
+

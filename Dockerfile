@@ -3,7 +3,7 @@ FROM python:3.11-slim
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
-# Dependências do sistema para WeasyPrint e health checks
+# Dependências do sistema para WeasyPrint, ffmpeg (IA) e ferramentas úteis
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libcairo2 \
     libpango-1.0-0 \
@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libffi-dev \
     shared-mime-info \
     fonts-dejavu-core \
+    ffmpeg \
     build-essential \
     pkg-config \
     curl \
@@ -19,12 +20,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# Copiar e instalar dependências core primeiro (cache eficiente)
-COPY requirements-core.txt ./
+# Copiar e instalar dependências (app completo com IA)
+COPY requirements.txt ./
 
-# Atualizar pip e instalar dependências core
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
-    pip install --no-cache-dir -r requirements-core.txt
+    # Torch/torchaudio CPU-only para evitar problemas de CUDA
+    pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu torch torchaudio && \
+    # Demais dependências
+    pip install --no-cache-dir -r requirements.txt
 
 # Copiar código da aplicação
 COPY . .
@@ -41,7 +44,9 @@ ENV FLASK_ENV=production \
     TIMEOUT=300 \
     PRELOAD=1 \
     ACCESS_LOG=- \
-    ERROR_LOG=-
+    ERROR_LOG=- \
+    OPENAI_MODEL=gpt-4o-mini \
+    WHISPER_MODEL=base
 
 EXPOSE 5000
 
