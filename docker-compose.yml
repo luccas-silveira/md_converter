@@ -4,8 +4,28 @@ services:
     container_name: md-converter
     ports:
       - "8080:5000"   # http://localhost:8080
-    volumes:
-      - ./:/app       # facilita editar arquivos localmente
     environment:
       - PYTHONUNBUFFERED=1
+      - FLASK_ENV=production
+      - FLASK_DEBUG=0
+      - LOG_LEVEL=INFO
+      - MAX_CONTENT_LENGTH=104857600  # 100MB
+    env_file:
+      - .env
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    volumes:
+      - upload_temp:/tmp/uploads
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+
+volumes:
+  upload_temp:

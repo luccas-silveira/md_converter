@@ -3,7 +3,7 @@ FROM python:3.11-slim
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
-# Dependências do sistema para WeasyPrint
+# Dependências do sistema para WeasyPrint e health checks
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libcairo2-dev \
     libpango-1.0-0 \
@@ -14,6 +14,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     fonts-dejavu-core \
     build-essential \
     pkg-config \
+    curl \
   && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -31,4 +32,4 @@ COPY . .
 EXPOSE 5000
 
 # Usar gunicorn em produção
-CMD ["gunicorn", "-b", "0.0.0.0:5000", "server:app", "--workers", "2", "--timeout", "120", "--preload"]
+CMD ["gunicorn", "-b", "0.0.0.0:5000", "app:app", "--workers", "2", "--timeout", "300", "--preload", "--access-logfile", "-", "--error-logfile", "-"]
