@@ -12,50 +12,25 @@ def create_app():
     """Factory function para criar a aplicação Flask"""
     app = Flask(__name__)
 
-    # Configurar prefixo para reverse proxy
-    class ReverseProxied(object):
-        def __init__(self, app, script_name=None, scheme=None, server=None):
-            self.app = app
-            self.script_name = script_name
-            self.scheme = scheme
-            self.server = server
-
-        def __call__(self, environ, start_response):
-            script_name = environ.get('HTTP_X_SCRIPT_NAME', '') or self.script_name
-            if script_name:
-                environ['SCRIPT_NAME'] = script_name
-                path_info = environ['PATH_INFO']
-                if path_info.startswith(script_name):
-                    environ['PATH_INFO'] = path_info[len(script_name):]
-            scheme = environ.get('HTTP_X_SCHEME', '') or self.scheme
-            if scheme:
-                environ['wsgi.url_scheme'] = scheme
-            server = environ.get('HTTP_X_FORWARDED_SERVER', '') or self.server
-            if server:
-                environ['HTTP_HOST'] = server
-            return self.app(environ, start_response)
-
-    app.wsgi_app = ReverseProxied(app.wsgi_app, script_name='/relatorio')
-
     # Configurações
     app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB max file size
     app.config['UPLOAD_FOLDER'] = '/tmp'
     app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-key-change-in-production')
     app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0  # Disable caching for development
 
-    # Registrar blueprints/rotas
+    # Registrar blueprints/rotas com prefixo /relatorio
     from app.routes.main import main_bp
     from app.routes.conversion import conversion_bp
     from app.routes.progress import progress_bp
 
-    app.register_blueprint(main_bp)
-    app.register_blueprint(conversion_bp)
-    app.register_blueprint(progress_bp)
+    app.register_blueprint(main_bp, url_prefix='/relatorio')
+    app.register_blueprint(conversion_bp, url_prefix='/relatorio')
+    app.register_blueprint(progress_bp, url_prefix='/relatorio')
 
     # Importar módulo de reunião condicionalmente
     try:
         from app.routes.meeting import meeting_bp
-        app.register_blueprint(meeting_bp)
+        app.register_blueprint(meeting_bp, url_prefix='/relatorio')
         print("✓ Módulo de reunião carregado com sucesso")
     except Exception as e:
         print(f"⚠️  Módulo de reunião não carregado: {e}")
