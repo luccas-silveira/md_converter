@@ -14,7 +14,7 @@ services:
       - .env
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/"]
+      test: ["CMD", "curl", "-f", "http://localhost:5000/relatorio/"]
       interval: 30s
       timeout: 10s
       retries: 3
