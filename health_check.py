@@ -10,7 +10,7 @@ import time
 def health_check():
     """Verifica se a aplicação está respondendo"""
     try:
-        response = requests.get('http://localhost:5000/', timeout=10)
+        response = requests.get('http://localhost:5000/relatorio/healthz', timeout=10)
         if response.status_code == 200:
             print("✅ Application is healthy")
             return True

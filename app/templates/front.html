@@ -541,7 +541,7 @@ Seu conteúdo em Markdown aqui...
                 progressBar.style.width = '0%';
 
                 // Start progress monitoring via SSE
-                const eventSource = new EventSource(`/progress/${sessionId}`);
+                const eventSource = new EventSource(`/relatorio/progress/${sessionId}`);
                 eventSource.onmessage = function(event) {
                     const data = JSON.parse(event.data);
                     progressPercent.textContent = data.percentage + '%';
@@ -571,7 +571,7 @@ Seu conteúdo em Markdown aqui...
                 form.append('cover_data', getVal('cover_data', ''));
 
                 const xhr = new XMLHttpRequest();
-                const endpoint = currentInputMode === 'meeting' ? '/process-meeting' : '/convert-md';
+                const endpoint = currentInputMode === 'meeting' ? '/relatorio/process-meeting' : '/relatorio/convert-md';
                 xhr.open('POST', endpoint, true);
                 xhr.responseType = 'blob';
 

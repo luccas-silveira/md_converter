@@ -3,7 +3,7 @@ FROM python:3.11-slim
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
-# Dependências do sistema para WeasyPrint e health checks
+# Dependências do sistema para WeasyPrint + IA (ffmpeg)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libcairo2 \
     libpango-1.0-0 \
@@ -15,16 +15,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     pkg-config \
     curl \
+    ffmpeg \
   && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Copiar e instalar dependências core primeiro (cache eficiente)
-COPY requirements-core.txt ./
+# Copiar requirements e instalar
+COPY requirements-core.txt requirements-ai.txt ./
 
-# Atualizar pip e instalar dependências core
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
-    pip install --no-cache-dir -r requirements-core.txt
+    pip install --no-cache-dir -r requirements-core.txt && \
+    pip install --no-cache-dir -r requirements-ai.txt
 
 # Copiar código da aplicação
 COPY . .
@@ -45,5 +46,5 @@ ENV FLASK_ENV=production \
 
 EXPOSE 5000
 
-# Usar gunicorn em produção, lendo variáveis de ambiente
 CMD ["sh", "-lc", "exec gunicorn -b 0.0.0.0:5000 server:app --workers ${WORKERS:-1} --threads ${THREADS:-2} --timeout ${TIMEOUT:-300} ${PRELOAD:+--preload} --access-logfile ${ACCESS_LOG:--} --error-logfile ${ERROR_LOG:--}"]
+

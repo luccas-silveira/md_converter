@@ -2,7 +2,7 @@
 Rotas para processamento de reuniões e geração de resumos
 """
 
-from flask import Blueprint, request, send_file, abort, jsonify
+from flask import Blueprint, request, send_file, abort, jsonify, current_app
 from pathlib import Path
 import tempfile
 import traceback
@@ -21,19 +21,21 @@ logger = logging.getLogger(__name__)
 # Get application root
 APP_ROOT = Path(__file__).resolve().parent.parent.parent
 
-# Configurar OpenAI API
+# Configurar OpenAI API e modelo
 openai_api_key = os.getenv('OPENAI_API_KEY')
+OPENAI_MODEL = os.getenv('OPENAI_MODEL', 'gpt-4o-mini')
 if openai_api_key:
     openai_client = OpenAI(api_key=openai_api_key)
-    logger.info("OpenAI API configurada com sucesso")
+    logger.info(f"OpenAI API configurada. Modelo: {OPENAI_MODEL}")
 else:
     openai_client = None
     logger.warning("OPENAI_API_KEY não encontrada - usando modo de demonstração")
 
-# Carregar modelo Whisper
+# Carregar modelo Whisper (nome via env)
 try:
-    whisper_model = whisper.load_model("base")
-    logger.info("Modelo Whisper carregado com sucesso")
+    whisper_model_name = os.getenv('WHISPER_MODEL', 'base')
+    whisper_model = whisper.load_model(whisper_model_name)
+    logger.info(f"Modelo Whisper '{whisper_model_name}' carregado com sucesso")
 except Exception as e:
     whisper_model = None
     logger.error(f"Erro ao carregar modelo Whisper: {e}")
@@ -78,7 +80,8 @@ def process_meeting():
             'data': meeting_date or request.form.get('cover_data', ''),
         }
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        upload_base = current_app.config.get('UPLOAD_FOLDER', '/tmp')
+        with tempfile.TemporaryDirectory(dir=upload_base) as tmpdir:
             tmpdir_path = Path(tmpdir)
             logger.info(f"Diretório temporário: {tmpdir_path}")
 
@@ -208,12 +211,12 @@ def generate_meeting_summary(transcript: str, participants: str, meeting_date: s
             prompt = prompt.replace(' <<TRANSCRIÇÂO >>', transcript[:4000])
 
             response = openai_client.chat.completions.create(
-                model="gpt-5-mini",
+                model=OPENAI_MODEL,
                 messages=[
                     {"role": "system", "content": "Você é um especialista em resumir reuniões de negócios de forma clara e profissional."},
                     {"role": "user", "content": prompt}
                 ],
-                max_completion_tokens=4000
+                max_tokens=1500
             )
 
             ai_summary = response.choices[0].message.content

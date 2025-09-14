@@ -20,6 +20,8 @@ cp .env.production .env
 **IMPORTANTE**: Edite o `.env` e configure:
 - `SECRET_KEY`: Uma string aleatória segura
 - `OPENAI_API_KEY`: Sua chave da API OpenAI
+ - `OPENAI_MODEL` (opcional): modelo da OpenAI para resumo. Padrão: `gpt-4o-mini`
+ - `WHISPER_MODEL` (opcional): modelo do Whisper. Padrão: `base` (recomendado `tiny`/`small` em VPS)
 
 ### 2. Gerar SECRET_KEY Segura
 
@@ -51,8 +53,8 @@ docker-compose --env-file .env.production up -d
 # Ver logs
 docker-compose logs -f
 
-# Health check
-curl http://localhost:8080/
+# Health check (endpoint dedicado)
+curl http://localhost:8080/relatorio/healthz
 
 # Status dos containers
 docker-compose ps
@@ -60,11 +62,11 @@ docker-compose ps
 
 ## Configurações de Produção
 
-### Recursos:
-- **Memória**: Limitado a 2GB
-- **CPU**: Limitado a 1 core
+### Recursos (serviço padrão):
+- **Memória**: 2GB (ajustável no compose)
+- **CPU**: 1 core (ajustável)
 - **Timeout**: 5 minutos para uploads grandes
-- **Workers**: 2 workers Gunicorn
+- **Workers/Threads**: por padrão `WORKERS=1`, `THREADS=2` (ajustável via env)
 
 ### Limites:
 - **Upload máximo**: 100MB
@@ -73,14 +75,15 @@ docker-compose ps
   - Markdown: MD, TXT
 
 ### Health Checks:
-- **Intervalo**: 30 segundos
-- **Timeout**: 10 segundos
-- **Retries**: 3 tentativas
+- Endpoint: `GET /relatorio/healthz`
+- Intervalo: 30 segundos
+- Timeout: 10 segundos
+- Retries: 3 tentativas
 
 ## URLs
 
 - **Aplicação**: http://localhost:8080
-- **Health Check**: http://localhost:8080/
+- **Health Check**: http://localhost:8080/relatorio/healthz
 
 ## Troubleshooting
 
@@ -130,6 +133,43 @@ git pull
 # Rebuild e restart
 docker-compose build
 docker-compose up -d
+```
+
+## IA Opcional (serviço separado)
+
+Para usar recursos de resumo de reunião (Whisper/Torch), suba o serviço opcional com perfil `ai`:
+
+```bash
+# Sobe o serviço padrão + serviço de IA
+docker compose --profile ai up -d
+
+# O serviço de IA expõe por padrão http://localhost:8081
+# Ajuste portas/recursos no docker-compose.yml conforme necessário
+```
+
+Requisitos adicionais:
+- Mais memória (recomendado 4GB+ para Whisper/Torch)
+- `ffmpeg` já incluso no Dockerfile.ai
+- Defina `WHISPER_MODEL=tiny` ou `small` se sua VPS for limitada em CPU/RAM
+
+## Volumes e Uploads
+
+- O diretório de uploads na produção é configurável via `UPLOAD_FOLDER` (default: `/data/uploads`).
+- O `docker-compose.yml` já cria e monta o volume `uploads:/data/uploads`.
+
+## Reverse Proxy e SSE (progresso)
+
+Se estiver atrás de Nginx/Caddy, desabilite buffering para SSE:
+
+Nginx (exemplo):
+```nginx
+location /relatorio/ {
+  proxy_pass http://127.0.0.1:8080;
+  proxy_http_version 1.1;
+  proxy_set_header Connection "";
+  proxy_buffering off;
+  proxy_read_timeout 360s;
+}
 ```
 
 ## Monitoramento

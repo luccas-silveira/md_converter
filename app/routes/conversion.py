@@ -2,7 +2,7 @@
 Rotas para conversão de Markdown para PDF
 """
 
-from flask import Blueprint, request, send_file, abort, jsonify
+from flask import Blueprint, request, send_file, abort, jsonify, current_app
 from pathlib import Path
 import tempfile
 import traceback
@@ -62,7 +62,9 @@ def convert_md():
 
         logo_file = request.files.get("logo")
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        # Usar diretório de upload configurável (persistente em produção)
+        upload_base = current_app.config.get('UPLOAD_FOLDER', '/tmp')
+        with tempfile.TemporaryDirectory(dir=upload_base) as tmpdir:
             tmpdir_path = Path(tmpdir)
             logger.info(f"Diretório temporário: {tmpdir_path}")
 
