@@ -34,7 +34,8 @@ def convert_md():
 
         filename = Path(uploaded.filename or "document.md").name
         logger.info(f"Arquivo recebido: {filename}")
-        
+        logger.info(f"Tipo de conteúdo: {uploaded.content_type}")
+
         if not filename.lower().endswith(".md"):
             # Permitimos ainda assim, tratando como markdown
             filename = f"{filename}.md"

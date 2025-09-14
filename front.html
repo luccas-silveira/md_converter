@@ -50,8 +50,20 @@
 
         <!-- Converter Card -->
         <div class="bg-brand-white rounded-3xl shadow-sm border border-gray-100 p-8 max-w-2xl mx-auto">
-            <!-- Upload Area -->
-            <div class="mb-8">
+            <!-- Input Method Tabs -->
+            <div class="mb-6">
+                <div class="flex space-x-1 bg-gray-100 p-1 rounded-xl">
+                    <button id="tab-file" class="flex-1 py-2 px-4 text-sm font-medium rounded-lg transition-all duration-200 bg-white text-brand-black shadow-sm">
+                        Enviar arquivo
+                    </button>
+                    <button id="tab-text" class="flex-1 py-2 px-4 text-sm font-medium rounded-lg transition-all duration-200 text-gray-600 hover:text-gray-800">
+                        Colar texto
+                    </button>
+                </div>
+            </div>
+
+            <!-- File Upload Area -->
+            <div id="upload-section" class="mb-8">
                 <div id="upload-area" class="relative border-2 border-dashed border-gray-200 rounded-2xl p-12 text-center cursor-pointer transition-all duration-300 hover:border-gray-300 hover:bg-gray-50">
                     <input type="file" id="file-input" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
                     
@@ -84,6 +96,35 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                             </svg>
                         </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Text Input Area -->
+            <div id="text-section" class="mb-8 hidden">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Cole seu texto Markdown aqui:</label>
+                        <textarea
+                            id="markdown-text"
+                            rows="12"
+                            class="w-full border border-gray-200 rounded-2xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-brand-green resize-vertical min-h-[200px]"
+                            placeholder="# Título do documento
+
+## Subtítulo
+
+Seu conteúdo em Markdown aqui...
+
+- Item 1
+- Item 2
+
+**Texto em negrito**
+
+*Texto em itálico*"></textarea>
+                    </div>
+                    <div class="flex items-center justify-between text-sm text-gray-500">
+                        <span>Suporte completo para sintaxe Markdown</span>
+                        <span id="char-count">0 caracteres</span>
                     </div>
                 </div>
             </div>
@@ -157,6 +198,15 @@
 
     <script>
         (function() {
+            // Tab elements
+            const tabFile = document.getElementById('tab-file');
+            const tabText = document.getElementById('tab-text');
+            const uploadSection = document.getElementById('upload-section');
+            const textSection = document.getElementById('text-section');
+            const markdownText = document.getElementById('markdown-text');
+            const charCount = document.getElementById('char-count');
+
+            // Upload elements
             const uploadArea = document.getElementById('upload-area');
             const fileInput = document.getElementById('file-input');
             const uploadDefault = document.getElementById('upload-default');
@@ -180,6 +230,7 @@
             };
 
             let selectedFile = null;
+            let currentInputMode = 'file'; // 'file' or 'text'
             // Sempre PDF
             let downloadUrl = null;
 
@@ -201,12 +252,20 @@
                 convertBtn.disabled = !enabled;
             }
 
+            function updateConvertButton() {
+                const hasContent = (currentInputMode === 'file' && selectedFile) ||
+                                 (currentInputMode === 'text' && markdownText.value.trim());
+                setConvertEnabled(hasContent);
+            }
+
             function resetAll() {
                 selectedFile = null;
                 if (downloadUrl) { URL.revokeObjectURL(downloadUrl); downloadUrl = null; }
                 uploadDefault.classList.remove('hidden');
                 uploadSelected.classList.add('hidden');
                 fileInput.value = '';
+                markdownText.value = '';
+                charCount.textContent = '0 caracteres';
                 // Sem seleção de formato
                 if (coverForm) coverForm.classList.add('hidden');
                 progressSection.classList.add('hidden');
@@ -217,6 +276,29 @@
                 // Sem botões de formato
             }
 
+            function switchToFileMode() {
+                currentInputMode = 'file';
+                tabFile.classList.remove('text-gray-600');
+                tabFile.classList.add('bg-white', 'text-brand-black', 'shadow-sm');
+                tabText.classList.add('text-gray-600');
+                tabText.classList.remove('bg-white', 'text-brand-black', 'shadow-sm');
+                uploadSection.classList.remove('hidden');
+                textSection.classList.add('hidden');
+                updateConvertButton();
+            }
+
+            function switchToTextMode() {
+                currentInputMode = 'text';
+                tabText.classList.remove('text-gray-600');
+                tabText.classList.add('bg-white', 'text-brand-black', 'shadow-sm');
+                tabFile.classList.add('text-gray-600');
+                tabFile.classList.remove('bg-white', 'text-brand-black', 'shadow-sm');
+                uploadSection.classList.add('hidden');
+                textSection.classList.remove('hidden');
+                if (coverForm) coverForm.classList.remove('hidden');
+                updateConvertButton();
+            }
+
             function setFile(file) {
                 selectedFile = file;
                 fileNameEl.textContent = file.name;
@@ -224,8 +306,19 @@
                 uploadDefault.classList.add('hidden');
                 uploadSelected.classList.remove('hidden');
                 if (coverForm) coverForm.classList.remove('hidden');
-                setConvertEnabled(!!selectedFile);
+                updateConvertButton();
             }
+
+            // Tab interactions
+            tabFile.addEventListener('click', switchToFileMode);
+            tabText.addEventListener('click', switchToTextMode);
+
+            // Text area interactions
+            markdownText.addEventListener('input', () => {
+                const text = markdownText.value;
+                charCount.textContent = `${text.length} caracteres`;
+                updateConvertButton();
+            });
 
             // Upload area interactions
             uploadArea.addEventListener('click', () => fileInput.click());
@@ -242,7 +335,10 @@
 
             // Convert
             convertBtn.addEventListener('click', () => {
-                if (!selectedFile || convertBtn.disabled) return;
+                const hasFile = currentInputMode === 'file' && selectedFile;
+                const hasText = currentInputMode === 'text' && markdownText.value.trim();
+
+                if ((!hasFile && !hasText) || convertBtn.disabled) return;
 
                 progressSection.classList.remove('hidden');
                 progressText.textContent = 'Gerando PDF...';
@@ -250,7 +346,14 @@
                 progressBar.style.width = '0%';
 
                 const form = new FormData();
-                form.append('file', selectedFile);
+
+                if (currentInputMode === 'file') {
+                    form.append('file', selectedFile);
+                } else {
+                    // Create a virtual file from text content
+                    const textBlob = new Blob([markdownText.value], { type: 'text/markdown' });
+                    form.append('file', textBlob, 'documento.md');
+                }
                 // Cover data (ids podem ter sido removidos; usa defaults quando ausentes)
                 form.append('cover_top_email', getVal('cover_top_email', ''));
                 form.append('cover_top_site', getVal('cover_top_site', ''));
@@ -284,7 +387,11 @@
                             if (downloadUrl) { URL.revokeObjectURL(downloadUrl); }
                             downloadUrl = URL.createObjectURL(blob);
                             downloadBtn.href = downloadUrl;
-                            const outName = (selectedFile.name.replace(/\.[^/.]+$/, '') || 'documento') + '.pdf';
+                            let fileName = 'documento';
+                            if (currentInputMode === 'file' && selectedFile) {
+                                fileName = selectedFile.name.replace(/\.[^/.]+$/, '') || 'documento';
+                            }
+                            const outName = fileName + '.pdf';
                             downloadBtn.setAttribute('download', outName);
                             // Dispara download automático
                             const tempLink = document.createElement('a');
