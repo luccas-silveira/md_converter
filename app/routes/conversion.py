@@ -1,32 +1,31 @@
+"""
+Rotas para conversão de Markdown para PDF
+"""
+
+from flask import Blueprint, request, send_file, abort, jsonify
 from pathlib import Path
 import tempfile
 import traceback
 import logging
+import uuid
 
-from flask import Flask, request, send_file, abort, jsonify
+from app.utils.md_to_pdf import md_to_pdf
+from app.routes.progress import update_progress
 
-from md_to_pdf import md_to_pdf
-
-# Configurar logging
-logging.basicConfig(level=logging.DEBUG)
+conversion_bp = Blueprint('conversion', __name__)
 logger = logging.getLogger(__name__)
 
-APP_ROOT = Path(__file__).resolve().parent
-
-app = Flask(__name__, static_folder=str(APP_ROOT), static_url_path="")
-
-
-@app.route("/")
-def index():
-    # Serve the frontend
-    return app.send_static_file("front.html")
+# Get application root
+APP_ROOT = Path(__file__).resolve().parent.parent.parent
 
 
-@app.route("/convert-md", methods=["POST"])
+@conversion_bp.route("/convert-md", methods=["POST"])
 def convert_md():
+    session_id = request.form.get('session_id', str(uuid.uuid4()))
     try:
         logger.info("=== INICIO DA CONVERSÃO ===")
-        
+        update_progress(session_id, 5, "Iniciando conversão...")
+
         uploaded = request.files.get("file")
         if not uploaded:
             logger.error("Nenhum arquivo enviado")
@@ -35,6 +34,7 @@ def convert_md():
         filename = Path(uploaded.filename or "document.md").name
         logger.info(f"Arquivo recebido: {filename}")
         logger.info(f"Tipo de conteúdo: {uploaded.content_type}")
+        update_progress(session_id, 15, "Processando arquivo...")
 
         if not filename.lower().endswith(".md"):
             # Permitimos ainda assim, tratando como markdown
@@ -42,6 +42,7 @@ def convert_md():
             logger.info(f"Arquivo renomeado para: {filename}")
 
         css_text = request.form.get("css") or None
+        update_progress(session_id, 25, "Preparando configurações...")
 
         # Dados da capa vindos do formulário do front-end
         cover_data = {
@@ -56,11 +57,11 @@ def convert_md():
             'preparado_phone': request.form.get('cover_prep_phone', ''),
             'data': request.form.get('cover_data', ''),
         }
-        
+
         logger.info(f"Cover data: {cover_data}")
 
         logo_file = request.files.get("logo")
-        
+
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir_path = Path(tmpdir)
             logger.info(f"Diretório temporário: {tmpdir_path}")
@@ -68,11 +69,11 @@ def convert_md():
             md_path = tmpdir_path / filename
             uploaded.save(md_path)
             logger.info(f"Arquivo salvo em: {md_path}")
-            
+
             # Verificar se o arquivo foi salvo corretamente
             if not md_path.exists():
                 raise Exception(f"Falha ao salvar arquivo em {md_path}")
-                
+
             with open(md_path, 'r', encoding='utf-8') as f:
                 content_preview = f.read()[:200]
                 logger.info(f"Conteúdo do arquivo (primeiros 200 chars): {content_preview}")
@@ -86,17 +87,16 @@ def convert_md():
 
             pdf_out = tmpdir_path / (Path(filename).stem + ".pdf")
             logger.info(f"PDF será salvo em: {pdf_out}")
-            
+
             # Verificar se arquivos necessários existem no APP_ROOT
-            logo_zoi = APP_ROOT / "logo_zoi.png"
-            capa_mockup = APP_ROOT / "capa mockup.jpg"
+            logo_zoi = APP_ROOT / "assets" / "images" / "logo_zoi.png"
+            capa_mockup = APP_ROOT / "assets" / "images" / "capa mockup.jpg"
             logger.info(f"Logo ZOI existe: {logo_zoi.exists()}")
             logger.info(f"Capa mockup existe: {capa_mockup.exists()}")
-            logger.info(f"APP_ROOT: {APP_ROOT}")
-            logger.info(f"Arquivos em APP_ROOT: {list(APP_ROOT.glob('*'))}")
 
             # Use o diretório do projeto como base para resolver fonts/ e logo_zoi.png
             logger.info("Iniciando conversão MD -> PDF")
+            update_progress(session_id, 60, "Convertendo para PDF...")
             md_to_pdf(
                 str(md_path),
                 str(pdf_out),
@@ -106,14 +106,16 @@ def convert_md():
                 cover_data=cover_data,
                 cover_template_path=None,
             )
-            
+
             logger.info("Conversão concluída com sucesso")
-            
+            update_progress(session_id, 90, "Finalizando...")
+
             # Verificar se o PDF foi criado
             if not pdf_out.exists():
                 raise Exception(f"PDF não foi criado em {pdf_out}")
-                
+
             logger.info(f"Tamanho do PDF: {pdf_out.stat().st_size} bytes")
+            update_progress(session_id, 100, "Concluído!")
 
             return send_file(
                 pdf_out,
@@ -129,14 +131,3 @@ def convert_md():
             "error": str(e),
             "traceback": traceback.format_exc()
         }), 500
-
-
-@app.errorhandler(500)
-def handle_500(e):
-    logger.error(f"Erro 500: {e}")
-    return jsonify({"error": "Erro interno do servidor"}), 500
-
-
-if __name__ == "__main__":
-    # Flask dev server
-    app.run(host="127.0.0.1", port=5000, debug=True)

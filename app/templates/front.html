@@ -53,11 +53,14 @@
             <!-- Input Method Tabs -->
             <div class="mb-6">
                 <div class="flex space-x-1 bg-gray-100 p-1 rounded-xl">
-                    <button id="tab-file" class="flex-1 py-2 px-4 text-sm font-medium rounded-lg transition-all duration-200 bg-white text-brand-black shadow-sm">
+                    <button id="tab-file" class="flex-1 py-2 px-3 text-sm font-medium rounded-lg transition-all duration-200 bg-white text-brand-black shadow-sm">
                         Enviar arquivo
                     </button>
-                    <button id="tab-text" class="flex-1 py-2 px-4 text-sm font-medium rounded-lg transition-all duration-200 text-gray-600 hover:text-gray-800">
+                    <button id="tab-text" class="flex-1 py-2 px-3 text-sm font-medium rounded-lg transition-all duration-200 text-gray-600 hover:text-gray-800">
                         Colar texto
+                    </button>
+                    <button id="tab-meeting" class="flex-1 py-2 px-3 text-sm font-medium rounded-lg transition-all duration-200 text-gray-600 hover:text-gray-800">
+                        Resumo de reunião
                     </button>
                 </div>
             </div>
@@ -125,6 +128,89 @@ Seu conteúdo em Markdown aqui...
                     <div class="flex items-center justify-between text-sm text-gray-500">
                         <span>Suporte completo para sintaxe Markdown</span>
                         <span id="char-count">0 caracteres</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Meeting Summary Section -->
+            <div id="meeting-section" class="mb-8 hidden">
+                <div class="space-y-4">
+                    <!-- Meeting Upload Area -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Arquivo da reunião:</label>
+                        <div id="meeting-upload-area" class="relative border-2 border-dashed border-gray-200 rounded-2xl p-8 text-center cursor-pointer transition-all duration-300 hover:border-gray-300 hover:bg-gray-50">
+                            <input type="file" id="meeting-file-input" accept=".mp3,.wav,.mp4,.avi,.mov,.txt,.docx,.pdf" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
+
+                            <!-- Default State -->
+                            <div id="meeting-upload-default" class="flex flex-col items-center">
+                                <div class="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center mb-3">
+                                    <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4V2a1 1 0 011-1h4a1 1 0 011 1v2h4a1 1 0 110 2h-1v12a2 2 0 01-2 2H6a2 2 0 01-2-2V6H3a1 1 0 110-2h4z"/>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6"/>
+                                    </svg>
+                                </div>
+                                <h4 class="text-md font-medium text-gray-700 mb-1">
+                                    Selecionar arquivo
+                                </h4>
+                                <p class="text-sm text-gray-500">
+                                    Áudio, vídeo ou transcrição (MP3, MP4, TXT, etc.)
+                                </p>
+                            </div>
+
+                            <!-- File Selected State -->
+                            <div id="meeting-upload-selected" class="hidden flex flex-col items-center">
+                                <div class="w-12 h-12 bg-brand-green rounded-xl flex items-center justify-center mb-3">
+                                    <svg class="w-6 h-6 text-brand-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                    </svg>
+                                </div>
+                                <h4 id="meeting-file-name" class="text-md font-medium text-brand-black mb-1"></h4>
+                                <p id="meeting-file-size" class="text-sm text-gray-500"></p>
+                                <button id="remove-meeting-file" class="mt-2 text-gray-400 hover:text-gray-600 transition-colors">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Meeting Info Fields -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Participantes da reunião:</label>
+                            <textarea
+                                id="meeting-participants"
+                                rows="3"
+                                class="w-full border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-green resize-vertical"
+                                placeholder="João Silva, Maria Santos, Pedro Costa..."></textarea>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Data da reunião:</label>
+                            <input
+                                id="meeting-date"
+                                type="date"
+                                class="w-full border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-green">
+                            <div class="mt-2">
+                                <label class="block text-xs text-gray-600 mb-1">Título da reunião (opcional):</label>
+                                <input
+                                    id="meeting-title"
+                                    type="text"
+                                    class="w-full border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-green"
+                                    placeholder="Reunião de planejamento...">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-blue-50 border border-blue-200 rounded-xl p-3">
+                        <div class="flex items-start space-x-2">
+                            <svg class="w-5 h-5 text-blue-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                            <div class="text-sm text-blue-700">
+                                <strong>Como funciona:</strong> Envie o arquivo da reunião e nossa IA gerará automaticamente um resumo estruturado em formato de relatório profissional.
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -201,8 +287,10 @@ Seu conteúdo em Markdown aqui...
             // Tab elements
             const tabFile = document.getElementById('tab-file');
             const tabText = document.getElementById('tab-text');
+            const tabMeeting = document.getElementById('tab-meeting');
             const uploadSection = document.getElementById('upload-section');
             const textSection = document.getElementById('text-section');
+            const meetingSection = document.getElementById('meeting-section');
             const markdownText = document.getElementById('markdown-text');
             const charCount = document.getElementById('char-count');
 
@@ -214,6 +302,18 @@ Seu conteúdo em Markdown aqui...
             const fileNameEl = document.getElementById('file-name');
             const fileSizeEl = document.getElementById('file-size');
             const removeFileBtn = document.getElementById('remove-file');
+
+            // Meeting elements
+            const meetingUploadArea = document.getElementById('meeting-upload-area');
+            const meetingFileInput = document.getElementById('meeting-file-input');
+            const meetingUploadDefault = document.getElementById('meeting-upload-default');
+            const meetingUploadSelected = document.getElementById('meeting-upload-selected');
+            const meetingFileNameEl = document.getElementById('meeting-file-name');
+            const meetingFileSizeEl = document.getElementById('meeting-file-size');
+            const removeMeetingFileBtn = document.getElementById('remove-meeting-file');
+            const meetingParticipants = document.getElementById('meeting-participants');
+            const meetingDate = document.getElementById('meeting-date');
+            const meetingTitle = document.getElementById('meeting-title');
             // Format selection removido: sempre PDF
             const convertBtn = document.getElementById('convert-btn');
             const progressSection = document.getElementById('progress-section');
@@ -230,7 +330,8 @@ Seu conteúdo em Markdown aqui...
             };
 
             let selectedFile = null;
-            let currentInputMode = 'file'; // 'file' or 'text'
+            let selectedMeetingFile = null;
+            let currentInputMode = 'file'; // 'file', 'text', or 'meeting'
             // Sempre PDF
             let downloadUrl = null;
 
@@ -254,18 +355,27 @@ Seu conteúdo em Markdown aqui...
 
             function updateConvertButton() {
                 const hasContent = (currentInputMode === 'file' && selectedFile) ||
-                                 (currentInputMode === 'text' && markdownText.value.trim());
+                                 (currentInputMode === 'text' && markdownText.value.trim()) ||
+                                 (currentInputMode === 'meeting' && selectedMeetingFile);
                 setConvertEnabled(hasContent);
             }
 
             function resetAll() {
                 selectedFile = null;
+                selectedMeetingFile = null;
                 if (downloadUrl) { URL.revokeObjectURL(downloadUrl); downloadUrl = null; }
                 uploadDefault.classList.remove('hidden');
                 uploadSelected.classList.add('hidden');
                 fileInput.value = '';
                 markdownText.value = '';
                 charCount.textContent = '0 caracteres';
+                // Meeting elements
+                meetingUploadDefault.classList.remove('hidden');
+                meetingUploadSelected.classList.add('hidden');
+                meetingFileInput.value = '';
+                meetingParticipants.value = '';
+                meetingDate.value = '';
+                meetingTitle.value = '';
                 // Sem seleção de formato
                 if (coverForm) coverForm.classList.add('hidden');
                 progressSection.classList.add('hidden');
@@ -278,28 +388,62 @@ Seu conteúdo em Markdown aqui...
 
             function switchToFileMode() {
                 currentInputMode = 'file';
+                // Update tab styles
                 tabFile.classList.remove('text-gray-600');
                 tabFile.classList.add('bg-white', 'text-brand-black', 'shadow-sm');
                 tabText.classList.add('text-gray-600');
                 tabText.classList.remove('bg-white', 'text-brand-black', 'shadow-sm');
+                tabMeeting.classList.add('text-gray-600');
+                tabMeeting.classList.remove('bg-white', 'text-brand-black', 'shadow-sm');
+                // Show/hide sections
                 uploadSection.classList.remove('hidden');
                 textSection.classList.add('hidden');
+                meetingSection.classList.add('hidden');
                 updateConvertButton();
             }
 
             function switchToTextMode() {
                 currentInputMode = 'text';
+                // Update tab styles
                 tabText.classList.remove('text-gray-600');
                 tabText.classList.add('bg-white', 'text-brand-black', 'shadow-sm');
                 tabFile.classList.add('text-gray-600');
                 tabFile.classList.remove('bg-white', 'text-brand-black', 'shadow-sm');
+                tabMeeting.classList.add('text-gray-600');
+                tabMeeting.classList.remove('bg-white', 'text-brand-black', 'shadow-sm');
+                // Show/hide sections
                 uploadSection.classList.add('hidden');
                 textSection.classList.remove('hidden');
+                meetingSection.classList.add('hidden');
+                if (coverForm) coverForm.classList.remove('hidden');
+                updateConvertButton();
+            }
+
+            function switchToMeetingMode() {
+                currentInputMode = 'meeting';
+                // Update tab styles
+                tabMeeting.classList.remove('text-gray-600');
+                tabMeeting.classList.add('bg-white', 'text-brand-black', 'shadow-sm');
+                tabFile.classList.add('text-gray-600');
+                tabFile.classList.remove('bg-white', 'text-brand-black', 'shadow-sm');
+                tabText.classList.add('text-gray-600');
+                tabText.classList.remove('bg-white', 'text-brand-black', 'shadow-sm');
+                // Show/hide sections
+                uploadSection.classList.add('hidden');
+                textSection.classList.add('hidden');
+                meetingSection.classList.remove('hidden');
                 if (coverForm) coverForm.classList.remove('hidden');
                 updateConvertButton();
             }
 
             function setFile(file) {
+                // Check file size (100MB limit)
+                const maxSize = 100 * 1024 * 1024; // 100MB in bytes
+                if (file.size > maxSize) {
+                    alert(`Arquivo muito grande! Tamanho máximo permitido: 100MB\n\nSeu arquivo: ${humanSize(file.size)}`);
+                    return;
+                }
+
                 selectedFile = file;
                 fileNameEl.textContent = file.name;
                 fileSizeEl.textContent = humanSize(file.size);
@@ -309,9 +453,26 @@ Seu conteúdo em Markdown aqui...
                 updateConvertButton();
             }
 
+            function setMeetingFile(file) {
+                // Check file size (100MB limit)
+                const maxSize = 100 * 1024 * 1024; // 100MB in bytes
+                if (file.size > maxSize) {
+                    alert(`Arquivo muito grande! Tamanho máximo permitido: 100MB\n\nSeu arquivo: ${humanSize(file.size)}\n\nDica: Para vídeos grandes, considere usar arquivos de áudio (MP3) ou transcrições em texto.`);
+                    return;
+                }
+
+                selectedMeetingFile = file;
+                meetingFileNameEl.textContent = file.name;
+                meetingFileSizeEl.textContent = humanSize(file.size);
+                meetingUploadDefault.classList.add('hidden');
+                meetingUploadSelected.classList.remove('hidden');
+                updateConvertButton();
+            }
+
             // Tab interactions
             tabFile.addEventListener('click', switchToFileMode);
             tabText.addEventListener('click', switchToTextMode);
+            tabMeeting.addEventListener('click', switchToMeetingMode);
 
             // Text area interactions
             markdownText.addEventListener('input', () => {
@@ -331,29 +492,72 @@ Seu conteúdo em Markdown aqui...
             fileInput.addEventListener('change', () => { if (fileInput.files[0]) setFile(fileInput.files[0]); });
             removeFileBtn.addEventListener('click', (e) => { e.stopPropagation(); resetAll(); });
 
+            // Meeting upload area interactions
+            meetingUploadArea.addEventListener('click', () => meetingFileInput.click());
+            meetingUploadArea.addEventListener('dragover', (e) => { e.preventDefault(); meetingUploadArea.classList.add('bg-gray-50'); });
+            meetingUploadArea.addEventListener('dragleave', () => meetingUploadArea.classList.remove('bg-gray-50'));
+            meetingUploadArea.addEventListener('drop', (e) => {
+                e.preventDefault(); meetingUploadArea.classList.remove('bg-gray-50');
+                if (e.dataTransfer.files && e.dataTransfer.files[0]) setMeetingFile(e.dataTransfer.files[0]);
+            });
+            meetingFileInput.addEventListener('change', () => { if (meetingFileInput.files[0]) setMeetingFile(meetingFileInput.files[0]); });
+            removeMeetingFileBtn.addEventListener('click', (e) => { e.stopPropagation(); resetAll(); });
+
             // Nenhuma seleção de formato (fixo em PDF)
 
             // Convert
             convertBtn.addEventListener('click', () => {
                 const hasFile = currentInputMode === 'file' && selectedFile;
                 const hasText = currentInputMode === 'text' && markdownText.value.trim();
+                const hasMeeting = currentInputMode === 'meeting' && selectedMeetingFile;
 
-                if ((!hasFile && !hasText) || convertBtn.disabled) return;
+                if ((!hasFile && !hasText && !hasMeeting) || convertBtn.disabled) return;
 
                 progressSection.classList.remove('hidden');
-                progressText.textContent = 'Gerando PDF...';
-                progressPercent.textContent = '0%';
-                progressBar.style.width = '0%';
+
+                // Generate unique session ID for progress tracking
+                const sessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
 
                 const form = new FormData();
+                form.append('session_id', sessionId);
 
                 if (currentInputMode === 'file') {
+                    progressText.textContent = 'Gerando PDF...';
                     form.append('file', selectedFile);
-                } else {
+                } else if (currentInputMode === 'text') {
+                    progressText.textContent = 'Gerando PDF...';
                     // Create a virtual file from text content
                     const textBlob = new Blob([markdownText.value], { type: 'text/markdown' });
                     form.append('file', textBlob, 'documento.md');
+                } else if (currentInputMode === 'meeting') {
+                    progressText.textContent = 'Iniciando processamento...';
+                    form.append('meeting_file', selectedMeetingFile);
+                    form.append('meeting_participants', meetingParticipants.value);
+                    form.append('meeting_date', meetingDate.value);
+                    form.append('meeting_title', meetingTitle.value);
                 }
+
+                progressPercent.textContent = '0%';
+                progressBar.style.width = '0%';
+
+                // Start progress monitoring via SSE
+                const eventSource = new EventSource(`/progress/${sessionId}`);
+                eventSource.onmessage = function(event) {
+                    const data = JSON.parse(event.data);
+                    progressPercent.textContent = data.percentage + '%';
+                    progressBar.style.width = data.percentage + '%';
+                    progressText.textContent = data.message;
+
+                    // Close connection when complete
+                    if (data.percentage >= 100) {
+                        eventSource.close();
+                    }
+                };
+
+                eventSource.onerror = function() {
+                    eventSource.close();
+                };
+
                 // Cover data (ids podem ter sido removidos; usa defaults quando ausentes)
                 form.append('cover_top_email', getVal('cover_top_email', ''));
                 form.append('cover_top_site', getVal('cover_top_site', ''));
@@ -367,22 +571,14 @@ Seu conteúdo em Markdown aqui...
                 form.append('cover_data', getVal('cover_data', ''));
 
                 const xhr = new XMLHttpRequest();
-                xhr.open('POST', '/convert-md', true);
+                const endpoint = currentInputMode === 'meeting' ? '/process-meeting' : '/convert-md';
+                xhr.open('POST', endpoint, true);
                 xhr.responseType = 'blob';
-
-                xhr.upload.onprogress = (e) => {
-                    if (e.lengthComputable) {
-                        const p = Math.round((e.loaded / e.total) * 60);
-                        progressPercent.textContent = p + '%';
-                        progressBar.style.width = p + '%';
-                    }
-                };
 
                 xhr.onreadystatechange = function() {
                     if (xhr.readyState === 4) {
+                        eventSource.close(); // Close SSE connection
                         if (xhr.status === 200) {
-                            progressPercent.textContent = '100%';
-                            progressBar.style.width = '100%';
                             const blob = xhr.response;
                             if (downloadUrl) { URL.revokeObjectURL(downloadUrl); }
                             downloadUrl = URL.createObjectURL(blob);
@@ -390,6 +586,9 @@ Seu conteúdo em Markdown aqui...
                             let fileName = 'documento';
                             if (currentInputMode === 'file' && selectedFile) {
                                 fileName = selectedFile.name.replace(/\.[^/.]+$/, '') || 'documento';
+                            } else if (currentInputMode === 'meeting') {
+                                const title = meetingTitle.value.trim();
+                                fileName = title ? title.replace(/[^a-z0-9]/gi, '_') : 'resumo_reuniao';
                             }
                             const outName = fileName + '.pdf';
                             downloadBtn.setAttribute('download', outName);
@@ -404,22 +603,27 @@ Seu conteúdo em Markdown aqui...
                             convertBtn.classList.add('hidden');
                             progressSection.classList.add('hidden');
                         } else {
-                            const ct = xhr.getResponseHeader('Content-Type') || '';
-                            if (ct.includes('application/json') && xhr.response) {
-                                const reader = new FileReader();
-                                reader.onload = () => {
-                                    try {
-                                        const text = reader.result || '';
-                                        const data = JSON.parse(text);
-                                        alert('Erro: ' + (data.error || 'Falha na conversão'));
-                                        console.error('Traceback:', data.traceback || '(sem traceback)');
-                                    } catch(e) {
-                                        alert('Erro na conversão (500).');
-                                    }
-                                };
-                                reader.readAsText(xhr.response);
+                            // Handle specific error codes
+                            if (xhr.status === 413) {
+                                alert('Arquivo muito grande! Tamanho máximo permitido: 100MB\n\nDica: Para vídeos grandes, considere usar arquivos de áudio (MP3) ou transcrições em texto.');
                             } else {
-                                alert('Erro na conversão (HTTP ' + xhr.status + ').');
+                                const ct = xhr.getResponseHeader('Content-Type') || '';
+                                if (ct.includes('application/json') && xhr.response) {
+                                    const reader = new FileReader();
+                                    reader.onload = () => {
+                                        try {
+                                            const text = reader.result || '';
+                                            const data = JSON.parse(text);
+                                            alert('Erro: ' + (data.error || 'Falha na conversão'));
+                                            console.error('Traceback:', data.traceback || '(sem traceback)');
+                                        } catch(e) {
+                                            alert('Erro na conversão (500).');
+                                        }
+                                    };
+                                    reader.readAsText(xhr.response);
+                                } else {
+                                    alert('Erro na conversão (HTTP ' + xhr.status + ').');
+                                }
                             }
                             progressSection.classList.add('hidden');
                         }
@@ -427,6 +631,7 @@ Seu conteúdo em Markdown aqui...
                 };
 
                 xhr.onerror = () => {
+                    eventSource.close();
                     alert('Falha de rede durante a conversão.');
                     progressSection.classList.add('hidden');
                 };

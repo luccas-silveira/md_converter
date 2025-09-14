@@ -1,8 +1,33 @@
 import markdown2
 import os
+import re
 from weasyprint import HTML, CSS
 import argparse
 from pathlib import Path
+
+def normalize_markdown_content(content):
+    """
+    Normaliza o conteúdo markdown para garantir formatação correta.
+
+    Corrige problemas como:
+    - Títulos sem linha em branco antes
+    - Múltiplos títulos consecutivos
+    """
+    lines = content.split('\n')
+    normalized_lines = []
+
+    for i, line in enumerate(lines):
+        # Se a linha atual é um título (começa com #)
+        if line.strip().startswith('#'):
+            # Se não é a primeira linha e a linha anterior não está vazia
+            if i > 0 and lines[i-1].strip() != '':
+                # Adiciona uma linha em branco antes do título
+                normalized_lines.append('')
+            normalized_lines.append(line)
+        else:
+            normalized_lines.append(line)
+
+    return '\n'.join(normalized_lines)
 
 def md_to_pdf(md_file_path, pdf_file_path=None, css_style=None, logo_path=None, base_dir=None, cover_data=None, cover_template_path=None):
     """
@@ -31,11 +56,12 @@ def md_to_pdf(md_file_path, pdf_file_path=None, css_style=None, logo_path=None, 
     # Diretório base para resolução de recursos
     resolved_base_dir = Path(base_dir).resolve() if base_dir else Path(md_file_path).resolve().parent
 
-    # Se logo não for informada, tentar logo_zoi.png ao lado do .md e no base_dir
+    # Se logo não for informada, tentar logo_zoi.png ao lado do .md e no assets/images
     if logo_path is None:
         candidates = [
             Path(md_file_path).with_name('logo_zoi.png'),
-            resolved_base_dir / 'logo_zoi.png',
+            resolved_base_dir / 'assets' / 'images' / 'logo_zoi.png',
+            resolved_base_dir / 'logo_zoi.png',  # fallback para compatibilidade
         ]
         for cand in candidates:
             if cand.exists():
@@ -45,7 +71,10 @@ def md_to_pdf(md_file_path, pdf_file_path=None, css_style=None, logo_path=None, 
     # Ler o conteúdo do arquivo Markdown
     with open(md_file_path, 'r', encoding='utf-8') as file:
         md_content = file.read()
-    
+
+    # Normalizar o conteúdo markdown (garantir quebras de linha corretas)
+    md_content = normalize_markdown_content(md_content)
+
     # Converter Markdown para HTML com extensões úteis
     html_content = markdown2.markdown(
         md_content,
@@ -302,7 +331,7 @@ def md_to_pdf(md_file_path, pdf_file_path=None, css_style=None, logo_path=None, 
             f"""
             @font-face {{
                 font-family: 'Clash';
-                src: url('fonts/{clash_file}');
+                src: url('assets/fonts/{clash_file}');
                 font-weight: 400;
                 font-style: normal;
             }}
@@ -313,7 +342,7 @@ def md_to_pdf(md_file_path, pdf_file_path=None, css_style=None, logo_path=None, 
             f"""
             @font-face {{
                 font-family: 'Satoshi';
-                src: url('fonts/{Satoshi_file}');
+                src: url('assets/fonts/{Satoshi_file}');
                 font-weight: 400;
                 font-style: normal;
             }}
@@ -338,6 +367,12 @@ def md_to_pdf(md_file_path, pdf_file_path=None, css_style=None, logo_path=None, 
         if cover_template_path and Path(cover_template_path).exists():
             return str(cover_template_path)
         candidates = [
+            resolved_base_dir / 'assets' / 'images' / 'capa mockup.jpg',
+            resolved_base_dir / 'assets' / 'images' / 'capa_mockup.jpg',
+            resolved_base_dir / 'assets' / 'images' / 'capa-mockup.jpg',
+            resolved_base_dir / 'assets' / 'images' / 'capa.png',
+            resolved_base_dir / 'assets' / 'images' / 'capa.jpg',
+            # Fallbacks para compatibilidade
             resolved_base_dir / 'capa mockup.jpg',
             resolved_base_dir / 'capa_mockup.jpg',
             resolved_base_dir / 'capa-mockup.jpg',
@@ -369,7 +404,7 @@ def md_to_pdf(md_file_path, pdf_file_path=None, css_style=None, logo_path=None, 
 
         cover_html = f"""
         <section class=\"cover-page\">
-            <img class=\"cover-bg\" src=\"{Path(cover_template).name}\" alt=\"Capa\" />
+            <img class=\"cover-bg\" src=\"{cover_template}\" alt=\"Capa\" />
             <div class=\"cover-top-right\">
                 <div>{top_email}</div>
                 <div>{top_site}</div>
