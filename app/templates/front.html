@@ -36,6 +36,12 @@
         </div>
     </header>
 
+    <script>
+        // Limite de tamanho vindo do servidor (MB → bytes)
+        window.APP_MAX_SIZE_MB = {{ max_size_mb | default(100) }};
+        window.APP_MAX_SIZE_BYTES = (window.APP_MAX_SIZE_MB || 100) * 1024 * 1024;
+    </script>
+
     <!-- Main Content -->
     <main class="max-w-4xl mx-auto px-6 py-16">
         <!-- Hero Section -->
@@ -437,10 +443,11 @@ Seu conteúdo em Markdown aqui...
             }
 
             function setFile(file) {
-                // Check file size (100MB limit)
-                const maxSize = 100 * 1024 * 1024; // 100MB in bytes
+                // Check file size using server-configured limit
+                const maxSize = window.APP_MAX_SIZE_BYTES || (100 * 1024 * 1024);
                 if (file.size > maxSize) {
-                    alert(`Arquivo muito grande! Tamanho máximo permitido: 100MB\n\nSeu arquivo: ${humanSize(file.size)}`);
+                    const maxMb = window.APP_MAX_SIZE_MB || 100;
+                    alert(`Arquivo muito grande! Tamanho máximo permitido: ${maxMb}MB\n\nSeu arquivo: ${humanSize(file.size)}`);
                     return;
                 }
 
@@ -454,10 +461,11 @@ Seu conteúdo em Markdown aqui...
             }
 
             function setMeetingFile(file) {
-                // Check file size (100MB limit)
-                const maxSize = 100 * 1024 * 1024; // 100MB in bytes
+                // Check file size using server-configured limit
+                const maxSize = window.APP_MAX_SIZE_BYTES || (100 * 1024 * 1024);
                 if (file.size > maxSize) {
-                    alert(`Arquivo muito grande! Tamanho máximo permitido: 100MB\n\nSeu arquivo: ${humanSize(file.size)}\n\nDica: Para vídeos grandes, considere usar arquivos de áudio (MP3) ou transcrições em texto.`);
+                    const maxMb = window.APP_MAX_SIZE_MB || 100;
+                    alert(`Arquivo muito grande! Tamanho máximo permitido: ${maxMb}MB\n\nSeu arquivo: ${humanSize(file.size)}\n\nDica: Para vídeos grandes, considere usar arquivos de áudio (MP3) ou transcrições em texto.`);
                     return;
                 }
 
@@ -605,7 +613,8 @@ Seu conteúdo em Markdown aqui...
                         } else {
                             // Handle specific error codes
                             if (xhr.status === 413) {
-                                alert('Arquivo muito grande! Tamanho máximo permitido: 100MB\n\nDica: Para vídeos grandes, considere usar arquivos de áudio (MP3) ou transcrições em texto.');
+                                const maxMb = window.APP_MAX_SIZE_MB || 100;
+                                alert(`Arquivo muito grande! Tamanho máximo permitido: ${maxMb}MB\n\nDica: Para vídeos grandes, considere usar arquivos de áudio (MP3) ou transcrições em texto.`);
                             } else {
                                 const ct = xhr.getResponseHeader('Content-Type') || '';
                                 if (ct.includes('application/json') && xhr.response) {

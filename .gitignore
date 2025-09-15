@@ -239,3 +239,6 @@ instance/
 *.bak
 *.backup
 *~
+
+/ops
+
