@@ -216,7 +216,7 @@ def generate_meeting_summary(transcript: str, participants: str, meeting_date: s
                     {"role": "system", "content": "Você é um especialista em resumir reuniões de negócios de forma clara e profissional."},
                     {"role": "user", "content": prompt}
                 ],
-                max_tokens=1500
+                max_completion_tokens=4000
             )
 
             ai_summary = response.choices[0].message.content
