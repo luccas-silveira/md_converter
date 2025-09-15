@@ -13,7 +13,7 @@ def create_app():
     app = Flask(__name__)
 
     # Configurações (agora via variáveis de ambiente com defaults)
-    app.config['MAX_CONTENT_LENGTH'] = int(os.environ.get('MAX_CONTENT_LENGTH', 100 * 1024 * 1024))
+    app.config['MAX_CONTENT_LENGTH'] = int(os.environ.get('MAX_CONTENT_LENGTH', 1024 * 1024 * 1024))
     app.config['UPLOAD_FOLDER'] = os.environ.get('UPLOAD_FOLDER', '/tmp')
     app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-key-change-in-production')
     app.config['SEND_FILE_MAX_AGE_DEFAULT'] = int(os.environ.get('SEND_FILE_MAX_AGE', 0))
@@ -48,9 +48,10 @@ def create_app():
     # Error handlers
     @app.errorhandler(413)
     def handle_file_too_large(e):
+        max_mb = int(app.config.get('MAX_CONTENT_LENGTH', 0) / (1024 * 1024))
         return {
-            "error": "Arquivo muito grande. Tamanho máximo permitido: 100MB",
-            "max_size_mb": 100
+            "error": f"Arquivo muito grande. Tamanho máximo permitido: {max_mb}MB",
+            "max_size_mb": max_mb
         }, 413
 
     @app.errorhandler(400)
@@ -71,9 +72,10 @@ def create_app():
 
     @app.errorhandler(RequestEntityTooLarge)
     def handle_request_too_large(e):
+        max_mb = int(app.config.get('MAX_CONTENT_LENGTH', 0) / (1024 * 1024))
         return {
-            "error": "Arquivo muito grande. Tamanho máximo permitido: 100MB",
-            "max_size_mb": 100
+            "error": f"Arquivo muito grande. Tamanho máximo permitido: {max_mb}MB",
+            "max_size_mb": max_mb
         }, 413
 
     # Healthcheck leve
