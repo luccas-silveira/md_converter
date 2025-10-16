@@ -126,10 +126,49 @@ sudo apt update && sudo apt install -y \
 
 ## Dicas e troubleshooting
 
-- Preview não aparece no iframe: alguns navegadores bloqueiam PDF embutido; use o botão “Download”.
+- Preview não aparece no iframe: alguns navegadores bloqueiam PDF embutido; use o botão "Download".
 - Capa desalinhada: ajuste `object-position` da `.cover-bg` ou as coordenadas em mm dos blocos `.cover-*`.
-- Fontes não aplicadas: confirme nomes dos arquivos (contendo “modica”/“clash”) e a pasta `fonts/` ao lado do app.
+- Fontes não aplicadas: confirme nomes dos arquivos (contendo "modica"/"clash") e a pasta `fonts/` ao lado do app.
 - Logo não aparece: verifique `logo_zoi.png` na raiz ou passe `--logo` na CLI; no web, o app procura na raiz automaticamente.
+
+
+## Segurança
+
+### Sanitização Automática de Nomes de Arquivo
+
+O MD Converter implementa **proteção contra ataques de path traversal** (CWE-22) através de sanitização automática de todos os nomes de arquivo enviados por usuários.
+
+**Características de Segurança:**
+
+- ✅ **Sanitização automática**: Todos os filenames são processados via `werkzeug.secure_filename()`
+- ✅ **Bloqueio de path traversal**: Sequências como `..`, `/`, `\` e null bytes são removidos
+- ✅ **Geração de nomes seguros**: Filenames completamente inválidos são substituídos por identificadores únicos (UUID)
+- ✅ **Limite de comprimento**: Nomes de arquivo são truncados para máximo de 200 caracteres
+- ✅ **Logging de tentativas suspeitas**: Tentativas de path traversal são registradas nos logs com IP do cliente
+
+**Exemplos de Transformação:**
+
+| Entrada do Usuário | Saída Sanitizada |
+|-------------------|------------------|
+| `../../etc/passwd` | `etc_passwd.md` |
+| `/etc/passwd` | `etc_passwd.md` |
+| `file<>name?.md` | `filename.md` |
+| `arquivo\x00.exe.md` | `arquivo.md` |
+| *(nome vazio)* | `uploaded_file_a1b2c3d4.md` |
+
+**Monitoramento:**
+
+Para verificar tentativas de ataque nos logs:
+
+```bash
+# Ver tentativas de path traversal
+docker logs md-converter | grep "path traversal"
+
+# Contar tentativas suspeitas
+docker logs md-converter --since 24h | grep -i "path traversal" | wc -l
+```
+
+Para mais detalhes sobre segurança, consulte [`docs/SECURITY.md`](docs/SECURITY.md).
 
 
 ## Licença

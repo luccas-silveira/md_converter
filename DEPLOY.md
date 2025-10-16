@@ -53,7 +53,46 @@ docker stats md-converter
 sudo ufw allow 8080/tcp
 ```
 
+## Monitoramento de Segurança
+
+### Verificar Tentativas de Path Traversal
+
+Monitore regularmente os logs para detectar tentativas de ataque:
+
+```bash
+# Ver todas as tentativas de path traversal
+docker logs md-converter | grep "path traversal"
+
+# Contar tentativas nas últimas 24 horas
+docker logs md-converter --since 24h | grep -i "path traversal" | wc -l
+
+# Identificar IPs suspeitos
+docker logs md-converter | grep "path traversal" | awk '{print $NF}' | sort | uniq -c | sort -rn
+
+# Verificar filenames inválidos
+docker logs md-converter | grep "Nome inválido"
+```
+
+### Alertas Recomendados
+
+Configure alertas para:
+- **Alta prioridade**: Mais de 10 tentativas de path traversal em 5 minutos do mesmo IP
+- **Média prioridade**: Mais de 50 filenames inválidos em 1 hora
+
+### Métricas de Segurança
+
+```bash
+# Taxa de uploads bem-sucedidos
+docker logs md-converter --since 1h | grep "PDF criado com sucesso" | wc -l
+
+# Taxa de erros 400 (filename inválido)
+docker logs md-converter --since 1h | grep "400" | wc -l
+```
+
+**Ação Recomendada**: Revise logs de segurança **diariamente** durante a primeira semana após deploy.
+
 ## Problemas comuns
 - Torch/Whisper pesados: use `WHISPER_MODEL=tiny` no `.env`.
 - Falha no healthcheck: confira `docker compose logs -f` e `curl http://localhost:8080/relatorio/healthz`.
+- Múltiplas tentativas de path traversal: Verifique se há ataque coordenado e considere implementar rate limiting.
 
