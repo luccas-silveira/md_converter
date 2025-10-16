@@ -11,9 +11,11 @@ import uuid
 import whisper
 from openai import OpenAI
 import os
+from werkzeug.utils import secure_filename
 
 from app.utils.md_to_pdf import md_to_pdf
 from app.routes.progress import update_progress
+from app.utils.file_security import sanitize_filename
 
 meeting_bp = Blueprint('meeting', __name__)
 logger = logging.getLogger(__name__)
@@ -53,8 +55,18 @@ def process_meeting():
             logger.error("Nenhum arquivo de reunião enviado")
             abort(400, "Nenhum arquivo de reunião enviado")
 
-        filename = Path(meeting_file.filename or "meeting").name
-        logger.info(f"Arquivo de reunião recebido: {filename}")
+        # Sanitizar nome do arquivo para prevenir path traversal
+        try:
+            filename = sanitize_filename(
+                meeting_file.filename,
+                default_extension='.txt',  # Default para reuniões
+                max_length=200
+            )
+        except ValueError as e:
+            logger.error(f"Erro ao sanitizar filename: {e}")
+            abort(400, "Nome de arquivo inválido")
+
+        logger.info(f"Arquivo de reunião recebido (sanitizado): {filename}")
         logger.info(f"Tipo de conteúdo: {meeting_file.content_type}")
 
         # Meeting metadata

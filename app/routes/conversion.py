@@ -8,9 +8,11 @@ import tempfile
 import traceback
 import logging
 import uuid
+from werkzeug.utils import secure_filename
 
 from app.utils.md_to_pdf import md_to_pdf
 from app.routes.progress import update_progress
+from app.utils.file_security import sanitize_filename
 
 conversion_bp = Blueprint('conversion', __name__)
 logger = logging.getLogger(__name__)
@@ -31,8 +33,18 @@ def convert_md():
             logger.error("Nenhum arquivo enviado")
             abort(400, "Nenhum arquivo enviado")
 
-        filename = Path(uploaded.filename or "document.md").name
-        logger.info(f"Arquivo recebido: {filename}")
+        # Sanitizar nome do arquivo para prevenir path traversal
+        try:
+            filename = sanitize_filename(
+                uploaded.filename,
+                default_extension='.md',
+                max_length=200
+            )
+        except ValueError as e:
+            logger.error(f"Erro ao sanitizar filename: {e}")
+            abort(400, "Nome de arquivo inválido")
+
+        logger.info(f"Arquivo recebido (sanitizado): {filename}")
         logger.info(f"Tipo de conteúdo: {uploaded.content_type}")
         update_progress(session_id, 15, "Processando arquivo...")
 
@@ -82,10 +94,20 @@ def convert_md():
 
             logo_path = None
             if logo_file and logo_file.filename:
-                logo_name = Path(logo_file.filename).name
-                logo_path = tmpdir_path / logo_name
-                logo_file.save(logo_path)
-                logger.info(f"Logo salva em: {logo_path}")
+                # Sanitizar nome do arquivo do logo
+                try:
+                    logo_name = sanitize_filename(
+                        logo_file.filename,
+                        max_length=100
+                    )
+                except ValueError as e:
+                    logger.warning(f"Logo filename inválido, ignorando logo: {e}")
+                    logo_name = None
+
+                if logo_name:
+                    logo_path = tmpdir_path / logo_name
+                    logo_file.save(logo_path)
+                    logger.info(f"Logo salva em: {logo_path}")
 
             pdf_out = tmpdir_path / (Path(filename).stem + ".pdf")
             logger.info(f"PDF será salvo em: {pdf_out}")
