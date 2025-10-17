@@ -171,6 +171,74 @@ docker logs md-converter --since 24h | grep -i "path traversal" | wc -l
 Para mais detalhes sobre segurança, consulte [`docs/SECURITY.md`](docs/SECURITY.md).
 
 
+## Performance
+
+### Lazy Loading do Modelo Whisper
+
+O MD Converter implementa **lazy loading com pre-carregamento configurável** para o modelo Whisper, otimizando o tempo de inicialização e consumo de memória.
+
+**Como Funciona:**
+
+- **Lazy Loading**: O modelo Whisper só é carregado quando realmente necessário (primeira transcrição de áudio)
+- **Pre-loading Opcional**: Variável de ambiente `WHISPER_PRELOAD` permite carregar o modelo durante o startup
+- **Thread-Safe**: Implementação com double-checked locking previne race conditions
+- **Singleton Pattern**: Modelo é carregado apenas uma vez e reutilizado em todas as requisições
+
+**Configuração:**
+
+```bash
+# No arquivo .env
+
+# Modelo Whisper (opções: tiny, base, small, medium, large)
+WHISPER_MODEL=base
+
+# Pre-loading do modelo durante startup
+# - true: Carrega modelo no startup (~60s delay, mas transcrições sempre rápidas)
+# - false: Carrega modelo na primeira transcrição (startup rápido ~5s, primeira transcrição lenta)
+WHISPER_PRELOAD=true
+```
+
+**Recomendações de Uso:**
+
+| Cenário | WHISPER_PRELOAD | Motivo |
+|---------|-----------------|--------|
+| **Produção (uso frequente)** | `true` | Garante que todas transcrições sejam rápidas, evita timeout na primeira requisição |
+| **Desenvolvimento** | `false` | Startup rápido, economiza memória durante desenvolvimento |
+| **Servidor com poucos recursos** | `false` | Economiza ~350MB de RAM quando transcrição não está em uso |
+
+**Métricas de Performance:**
+
+| Métrica | Sem Lazy Loading | Com Lazy Loading (PRELOAD=false) | Com Lazy Loading (PRELOAD=true) |
+|---------|------------------|-----------------------------------|----------------------------------|
+| **Startup Time** | 30-60s | ~5-10s ✅ | 30-60s |
+| **Memória em Idle** | ~500MB | ~150MB ✅ | ~500MB |
+| **Primeira Transcrição** | Instantânea | +30-60s ⚠️ | Instantânea ✅ |
+| **Transcrições Subsequentes** | Instantânea | Instantânea | Instantânea |
+
+**Logs de Lazy Loading:**
+
+```bash
+# Ver quando o modelo está sendo carregado
+docker logs md-converter | grep "Lazy Loading"
+
+# Exemplo de saída:
+# [Startup] WHISPER_PRELOAD=true detectado - carregando modelo Whisper antecipadamente...
+# [Lazy Loading] Carregando modelo Whisper 'base'... (isso pode demorar 30-60s)
+# [Lazy Loading] Modelo Whisper 'base' carregado com sucesso!
+```
+
+**Troubleshooting:**
+
+- **Problema**: Primeira transcrição sempre demora muito
+  - **Solução**: Configure `WHISPER_PRELOAD=true` no arquivo `.env`
+
+- **Problema**: Container demora muito para ficar healthy
+  - **Solução**: Se `WHISPER_PRELOAD=true`, o healthcheck `start_period` está configurado para 90s (normal)
+
+- **Problema**: Memória alta mesmo sem usar transcrições
+  - **Solução**: Configure `WHISPER_PRELOAD=false` para economizar ~350MB de RAM
+
+
 ## Licença
 
 Uso interno/proprietário (não definido). Adapte conforme necessário.

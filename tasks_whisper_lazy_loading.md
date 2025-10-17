@@ -112,8 +112,8 @@
       get_whisper_model()
   ```
 * [x] Configurar `WHISPER_PRELOAD=true` no `.env` - **ATIVADO por padrão para produção**
-* [x] Documentar variável `WHISPER_PRELOAD` no `.env.example`
-* [ ] Adicionar ao README.md - **Próxima tarefa**
+* [x] Documentar variável `WHISPER_PRELOAD` no `.env.example` - **Criado (em gitignore)**
+* [x] Adicionar ao README.md - **Seção completa de Performance adicionada**
 
 ### 5.2. Feedback de Carregamento ao Usuário
 
