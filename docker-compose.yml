@@ -19,7 +19,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
+      start_period: 90s  # Aumentado para 90s para acomodar WHISPER_PRELOAD=true (~60s para carregar modelo)
     volumes:
       - uploads:/data/uploads
     deploy:
