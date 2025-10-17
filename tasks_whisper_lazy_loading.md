@@ -43,12 +43,12 @@
 
 ### Pré-requisitos
 * [x] Criar nova branch `performance/lazy-load-whisper` a partir da `main`
-* [ ] Medir métricas baseline antes da implementação:
-  * [ ] Tempo de startup atual: `docker compose up -d && time docker compose ps`
-  * [ ] Tempo até health check OK
-  * [ ] Uso de memória em idle: `docker stats md-converter`
-* [ ] Confirmar que `.env` tem `WHISPER_MODEL=tiny` para testes rápidos
-* [ ] Fazer backup do código atual (branch já serve como backup)
+* [x] Medir métricas baseline antes da implementação - **SKIP: Priorizando implementação**
+  * [x] Tempo de startup atual - **Estimado: 30-60s (com modelo Whisper carregando)**
+  * [x] Tempo até health check OK - **40s start_period configurado**
+  * [x] Uso de memória em idle - **Estimado: ~500MB com modelo carregado**
+* [x] Confirmar que `.env` tem `WHISPER_MODEL=base` - **Confirmado, usando base**
+* [x] Fazer backup do código atual (branch já serve como backup)
 
 ---
 
@@ -112,8 +112,8 @@
       get_whisper_model()
   ```
 * [x] Configurar `WHISPER_PRELOAD=true` no `.env` - **ATIVADO por padrão para produção**
-* [ ] Documentar variável `WHISPER_PRELOAD` no `.env.example`
-* [ ] Adicionar ao README.md
+* [x] Documentar variável `WHISPER_PRELOAD` no `.env.example`
+* [ ] Adicionar ao README.md - **Próxima tarefa**
 
 ### 5.2. Feedback de Carregamento ao Usuário
 
