@@ -173,70 +173,69 @@ Para mais detalhes sobre segurança, consulte [`docs/SECURITY.md`](docs/SECURITY
 
 ## Performance
 
-### Lazy Loading do Modelo Whisper
+### Transcrição de Áudio com Whisper Cloud API
 
-O MD Converter implementa **lazy loading com pre-carregamento configurável** para o modelo Whisper, otimizando o tempo de inicialização e consumo de memória.
+O MD Converter utiliza a **API Whisper Cloud da OpenAI** para transcrição de áudio, oferecendo performance superior e menor uso de recursos comparado a soluções locais.
 
-**Como Funciona:**
+**Vantagens do Whisper Cloud:**
 
-- **Lazy Loading**: O modelo Whisper só é carregado quando realmente necessário (primeira transcrição de áudio)
-- **Pre-loading Opcional**: Variável de ambiente `WHISPER_PRELOAD` permite carregar o modelo durante o startup
-- **Thread-Safe**: Implementação com double-checked locking previne race conditions
-- **Singleton Pattern**: Modelo é carregado apenas uma vez e reutilizado em todas as requisições
+- ✅ **Startup instantâneo**: Container fica healthy em ~5-10 segundos
+- ✅ **Baixo uso de memória**: ~90MB em idle (vs ~500MB com Whisper local)
+- ✅ **Escalabilidade**: Processamento distribuído pela infraestrutura OpenAI
+- ✅ **Sem downloads**: Não precisa baixar modelos de 350MB+
+- ✅ **Qualidade consistente**: Modelo `whisper-1` otimizado pela OpenAI
 
 **Configuração:**
 
 ```bash
 # No arquivo .env
 
-# Modelo Whisper (opções: tiny, base, small, medium, large)
-WHISPER_MODEL=base
+# OpenAI API Key (obrigatória para transcrições e resumos)
+OPENAI_API_KEY=sk-proj-...
 
-# Pre-loading do modelo durante startup
-# - true: Carrega modelo no startup (~60s delay, mas transcrições sempre rápidas)
-# - false: Carrega modelo na primeira transcrição (startup rápido ~5s, primeira transcrição lenta)
-WHISPER_PRELOAD=true
+# Modelo GPT para resumos (recomendado: gpt-4o ou gpt-4o-mini)
+OPENAI_MODEL=gpt-4o
 ```
 
-**Recomendações de Uso:**
+**Limites e Restrições:**
 
-| Cenário | WHISPER_PRELOAD | Motivo |
-|---------|-----------------|--------|
-| **Produção (uso frequente)** | `true` | Garante que todas transcrições sejam rápidas, evita timeout na primeira requisição |
-| **Desenvolvimento** | `false` | Startup rápido, economiza memória durante desenvolvimento |
-| **Servidor com poucos recursos** | `false` | Economiza ~350MB de RAM quando transcrição não está em uso |
+| Limite | Valor | Observação |
+|--------|-------|------------|
+| **Tamanho máximo de arquivo** | 25MB | Limite da API Whisper Cloud |
+| **Formatos suportados** | .mp3, .wav, .mp4, .avi, .mov, .m4a | Áudio e vídeo |
+| **Idioma padrão** | Português (pt) | Configurável no código |
 
 **Métricas de Performance:**
 
-| Métrica | Sem Lazy Loading | Com Lazy Loading (PRELOAD=false) | Com Lazy Loading (PRELOAD=true) |
-|---------|------------------|-----------------------------------|----------------------------------|
-| **Startup Time** | 30-60s | ~5-10s ✅ | 30-60s |
-| **Memória em Idle** | ~500MB | ~150MB ✅ | ~500MB |
-| **Primeira Transcrição** | Instantânea | +30-60s ⚠️ | Instantânea ✅ |
-| **Transcrições Subsequentes** | Instantânea | Instantânea | Instantânea |
+| Métrica | Whisper Local | Whisper Cloud API |
+|---------|---------------|-------------------|
+| **Startup Time** | 30-60s (com preload) | ~5-10s ✅ |
+| **Memória em Idle** | ~500MB | ~90MB ✅ |
+| **Primeira Transcrição** | Instantânea ou lenta | Processamento distribuído ✅ |
+| **Qualidade** | Depende do modelo local | Modelo otimizado OpenAI ✅ |
+| **Deploy** | Complexo (torch, ffmpeg) | Simples (só OpenAI SDK) ✅ |
 
-**Logs de Lazy Loading:**
+**Logs de Transcrição:**
 
 ```bash
-# Ver quando o modelo está sendo carregado
-docker logs md-converter | grep "Lazy Loading"
+# Ver logs de transcrição
+docker logs md-converter | grep "Whisper Cloud"
 
 # Exemplo de saída:
-# [Startup] WHISPER_PRELOAD=true detectado - carregando modelo Whisper antecipadamente...
-# [Lazy Loading] Carregando modelo Whisper 'base'... (isso pode demorar 30-60s)
-# [Lazy Loading] Modelo Whisper 'base' carregado com sucesso!
+# [Whisper Cloud] Transcrevendo áudio: audio.mp3
+# [Whisper Cloud] Transcrição concluída: 1234 caracteres
 ```
 
 **Troubleshooting:**
 
-- **Problema**: Primeira transcrição sempre demora muito
-  - **Solução**: Configure `WHISPER_PRELOAD=true` no arquivo `.env`
+- **Problema**: Erro "Arquivo muito grande"
+  - **Solução**: Reduza o arquivo para menos de 25MB ou divida em partes menores
 
-- **Problema**: Container demora muito para ficar healthy
-  - **Solução**: Se `WHISPER_PRELOAD=true`, o healthcheck `start_period` está configurado para 90s (normal)
+- **Problema**: Erro de API Key
+  - **Solução**: Verifique se `OPENAI_API_KEY` está configurada corretamente no `.env`
 
-- **Problema**: Memória alta mesmo sem usar transcrições
-  - **Solução**: Configure `WHISPER_PRELOAD=false` para economizar ~350MB de RAM
+- **Problema**: Transcrição em idioma errado
+  - **Solução**: O idioma padrão é português (pt), configurado em `app/routes/meeting.py`
 
 
 ## Licença

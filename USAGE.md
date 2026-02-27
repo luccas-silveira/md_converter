@@ -3,11 +3,12 @@
 ## Limites e Restrições
 
 ### Tamanho de Arquivo
-- **Tamanho máximo**: 100MB por arquivo
+- **Tamanho máximo geral**: 100MB por arquivo
+- **Limite Whisper Cloud API**: 25MB para arquivos de áudio/vídeo
 - **Formatos recomendados para reuniões grandes**:
   - Áudio MP3 (menor que vídeo)
-  - Transcrições em texto (.txt, .md)
-  - Vídeos comprimidos
+  - Transcrições em texto (.txt, .md) - sem limite de 25MB
+  - Vídeos comprimidos (atenção ao limite de 25MB para transcrição)
 
 ### Formatos Suportados
 
@@ -35,19 +36,26 @@
 ## Troubleshooting
 
 ### Erro 413 - Arquivo Muito Grande
-- Reduza o tamanho do arquivo
+- Reduza o tamanho do arquivo para menos de 100MB
 - Use formato de áudio ao invés de vídeo
 - Comprima o arquivo antes do upload
+
+### Erro "Arquivo muito grande" (Whisper)
+- **Causa**: Arquivo de áudio/vídeo maior que 25MB (limite da API Whisper)
+- **Solução 1**: Comprima o áudio para menos de 25MB
+- **Solução 2**: Use uma transcrição manual em .txt (sem limite)
+- **Solução 3**: Divida o áudio em partes menores
 
 ### Transcrição de Baixa Qualidade
 - Verifique a qualidade do áudio
 - Use arquivos com menos ruído de fundo
 - Considere fazer uma transcrição manual em .txt
+- Whisper Cloud API já usa modelo otimizado
 
 ### Processamento Lento
-- Arquivos maiores demoram mais
-- Transcrições de áudio são mais rápidas que de vídeo
+- Whisper Cloud API processa remotamente (depende da conexão)
 - Arquivos de texto são processados instantaneamente
+- Resumos GPT-4o são mais lentos que GPT-4o-mini (mas mais precisos)
 
 ## Formatos de Saída
 
@@ -57,9 +65,9 @@
 - Transcrição original (primeiros 1500 caracteres)
 - Metadados (data, participantes)
 
-### Estrutura do Resumo:
-1. **Resumo Executivo**
-2. **Pontos Principais Discutidos**
-3. **Decisões Tomadas**
-4. **Ações e Responsáveis**
-5. **Próximos Passos**
+### Estrutura do Resumo (Gerado por GPT-4o):
+1. **Resumo Geral da Reunião** - Tópicos agrupados por contexto (automático)
+2. **Tarefas Decididas** - Tabelas agrupadas por responsável
+3. **Ideias / Ações Consideradas** - Itens discutidos mas sem compromisso
+
+**Nota**: O resumo é gerado pela IA sem metaprompts ou headers duplicados. A capa do PDF já contém título, data e participantes.

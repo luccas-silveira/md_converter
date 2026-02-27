@@ -152,6 +152,5 @@ def convert_md():
         logger.error(f"ERRO DURANTE CONVERSÃO: {str(e)}")
         logger.error(f"Traceback completo: {traceback.format_exc()}")
         return jsonify({
-            "error": str(e),
-            "traceback": traceback.format_exc()
+            "error": "Erro interno durante a conversão"
         }), 500

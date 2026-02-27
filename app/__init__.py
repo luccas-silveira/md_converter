@@ -10,7 +10,7 @@ import os
 
 def create_app():
     """Factory function para criar a aplicação Flask"""
-    app = Flask(__name__)
+    app = Flask(__name__, static_url_path='/relatorio/static')
 
     # Configurações (agora via variáveis de ambiente com defaults)
     app.config['MAX_CONTENT_LENGTH'] = int(os.environ.get('MAX_CONTENT_LENGTH', 1024 * 1024 * 1024))
@@ -23,9 +23,8 @@ def create_app():
         upload_dir = Path(app.config['UPLOAD_FOLDER'])
         if str(upload_dir) not in ('/tmp', '/var/tmp'):
             upload_dir.mkdir(parents=True, exist_ok=True)
-    except Exception:
-        # Evitar falhar no boot por permissão; logs via servidor
-        pass
+    except Exception as e:
+        print(f"WARNING: Falha ao criar diretório de upload '{app.config['UPLOAD_FOLDER']}': {e}")
 
     # Registrar blueprints/rotas com prefixo /relatorio
     from app.routes.main import main_bp
@@ -41,7 +40,7 @@ def create_app():
         from app.routes.meeting import meeting_bp
         app.register_blueprint(meeting_bp, url_prefix='/relatorio')
         print("✓ Módulo de reunião carregado com sucesso")
-    except Exception as e:
+    except (ImportError, ModuleNotFoundError) as e:
         print(f"⚠️  Módulo de reunião não carregado: {e}")
         print("   A aplicação continuará funcionando sem recursos de IA")
 

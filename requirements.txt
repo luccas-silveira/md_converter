@@ -12,6 +12,4 @@ requests==2.32.3
 
 # IA
 openai>=1.30.0
-openai-whisper==20231117
-ffmpeg-python==0.2.0
 

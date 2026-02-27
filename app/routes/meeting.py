@@ -8,15 +8,19 @@ import tempfile
 import traceback
 import logging
 import uuid
-import threading
-import whisper
-from openai import OpenAI
+from typing import Optional, List
 import os
-from werkzeug.utils import secure_filename
+import threading
 
 from app.utils.md_to_pdf import md_to_pdf
 from app.routes.progress import update_progress
 from app.utils.file_security import sanitize_filename
+from config.env_loader import load_env_from_file
+
+# Garantir que variáveis do .env estejam carregadas antes de acessar OpenAI
+load_env_from_file()
+
+from openai import OpenAI
 
 meeting_bp = Blueprint('meeting', __name__)
 logger = logging.getLogger(__name__)
@@ -24,69 +28,96 @@ logger = logging.getLogger(__name__)
 # Get application root
 APP_ROOT = Path(__file__).resolve().parent.parent.parent
 
-# Configurar OpenAI API e modelo
-openai_api_key = os.getenv('OPENAI_API_KEY')
-OPENAI_MODEL = os.getenv('OPENAI_MODEL', 'gpt-4o-mini')
-if openai_api_key:
-    openai_client = OpenAI(api_key=openai_api_key)
-    logger.info(f"OpenAI API configurada. Modelo: {OPENAI_MODEL}")
-else:
-    openai_client = None
-    logger.warning("OPENAI_API_KEY não encontrada - usando modo de demonstração")
-
-# Lazy loading do modelo Whisper - variáveis globais
-_whisper_model = None
-_whisper_model_lock = threading.Lock()
+# Configurar OpenAI API e modelo (carregados dinamicamente)
+DEFAULT_MODEL = 'gpt-4o-mini'
+_openai_client: Optional[OpenAI] = None
+_openai_api_key_loaded: Optional[str] = None
+_logged_missing_key = False
+_openai_lock = threading.Lock()
 
 
-def get_whisper_model():
+def get_model_candidates() -> List[str]:
+    """Retorna a lista de modelos a tentar, priorizando o configurado via ambiente."""
+    preferred = os.getenv('OPENAI_MODEL')
+    models: List[str] = []
+    if preferred:
+        models.append(preferred)
+    if DEFAULT_MODEL not in models:
+        models.append(DEFAULT_MODEL)
+    return models
+
+
+def get_openai_client() -> Optional[OpenAI]:
+    """Obtém (ou cria) um cliente OpenAI baseado nas variáveis de ambiente atuais."""
+    global _openai_client, _openai_api_key_loaded, _logged_missing_key
+
+    with _openai_lock:
+        api_key = os.getenv('OPENAI_API_KEY')
+        if not api_key:
+            if not _logged_missing_key:
+                logger.warning("OPENAI_API_KEY não encontrada - usando modo de demonstração")
+                _logged_missing_key = True
+            _openai_client = None
+            _openai_api_key_loaded = None
+            return None
+
+        _logged_missing_key = False
+
+        if api_key != _openai_api_key_loaded:
+            _openai_client = OpenAI(api_key=api_key)
+            _openai_api_key_loaded = api_key
+            logger.info(f"OpenAI API configurada. Modelo preferencial: {os.getenv('OPENAI_MODEL', DEFAULT_MODEL)}")
+
+        return _openai_client
+
+def transcribe_audio_cloud(file_path: Path, language: str = "pt") -> str:
     """
-    Obtém a instância do modelo Whisper usando lazy loading e singleton pattern.
+    Transcreve áudio usando Whisper Cloud API da OpenAI.
 
-    Esta função implementa lazy loading thread-safe do modelo Whisper para evitar
-    que o modelo seja carregado durante o import/startup da aplicação, o que pode
-    causar delays significativos (30-60 segundos) e alto consumo de memória (~500MB).
+    Vantagens sobre Whisper local:
+    - Sem necessidade de carregar modelo (~350MB RAM)
+    - Transcrição mais rápida (processamento distribuído)
+    - Suporte a arquivos maiores (até 25MB)
+    - Menor complexidade de deploy
 
-    Com lazy loading:
-    - O modelo só é carregado quando realmente necessário (primeira transcrição)
-    - Startup da aplicação é rápido (<10s)
-    - Memória em idle é reduzida (~150MB ao invés de ~500MB)
-    - Health checks passam rapidamente sem timeout
-
-    Thread Safety:
-    Usa double-checked locking pattern para garantir que múltiplas threads
-    concorrentes não tentem carregar o modelo simultaneamente, o que poderia
-    causar desperdício de recursos ou race conditions.
+    Args:
+        file_path: Caminho do arquivo de áudio
+        language: Código do idioma (padrão: 'pt' para português)
 
     Returns:
-        whisper.Whisper: Instância do modelo Whisper carregado
+        Texto transcrito
 
     Raises:
-        RuntimeError: Se houver erro ao carregar o modelo
+        ValueError: Arquivo muito grande (>25MB)
+        Exception: Erro na API OpenAI
     """
-    global _whisper_model
+    logger.info(f"[Whisper Cloud] Transcrevendo áudio: {file_path.name}")
 
-    # Primeira verificação (sem lock) - fast path para chamadas subsequentes
-    if _whisper_model is not None:
-        return _whisper_model
+    client = get_openai_client()
+    if not client:
+        raise RuntimeError("OpenAI API não configurada")
 
-    # Segunda verificação (com lock) - garante que apenas uma thread carrega o modelo
-    with _whisper_model_lock:
-        # Re-verificar dentro do lock (outra thread pode ter carregado enquanto esperávamos)
-        if _whisper_model is not None:
-            return _whisper_model
+    # Validar tamanho do arquivo (limite da API: 25MB)
+    file_size_mb = file_path.stat().st_size / (1024 * 1024)
+    if file_size_mb > 25:
+        raise ValueError(f"Arquivo muito grande ({file_size_mb:.1f}MB). Limite: 25MB")
 
-        # Carregar modelo pela primeira vez
-        try:
-            whisper_model_name = os.getenv('WHISPER_MODEL', 'base')
-            logger.info(f"[Lazy Loading] Carregando modelo Whisper '{whisper_model_name}'... (isso pode demorar 30-60s)")
-            _whisper_model = whisper.load_model(whisper_model_name)
-            logger.info(f"[Lazy Loading] Modelo Whisper '{whisper_model_name}' carregado com sucesso!")
-            return _whisper_model
-        except Exception as e:
-            error_msg = f"Erro ao carregar modelo Whisper: {e}"
-            logger.error(f"[Lazy Loading] {error_msg}")
-            raise RuntimeError(error_msg) from e
+    try:
+        with open(file_path, 'rb') as audio_file:
+            response = client.audio.transcriptions.create(
+                model="whisper-1",  # Modelo universal da API
+                file=audio_file,
+                language=language,
+                response_format="text"
+            )
+
+        transcript = response if isinstance(response, str) else response
+        logger.info(f"[Whisper Cloud] Transcrição concluída: {len(transcript)} caracteres")
+        return transcript
+
+    except Exception as e:
+        logger.error(f"[Whisper Cloud] Erro na transcrição: {e}")
+        raise
 
 
 @meeting_bp.route("/process-meeting", methods=["POST"])
@@ -186,15 +217,14 @@ def process_meeting():
                 pdf_out,
                 mimetype="application/pdf",
                 as_attachment=True,
-                download_name=f"{meeting_title.replace(' ', '_')}.pdf",
+                download_name=sanitize_filename(meeting_title + '.pdf', default_extension='.pdf', max_length=200),
             )
 
     except Exception as e:
         logger.error(f"ERRO DURANTE PROCESSAMENTO DE REUNIÃO: {str(e)}")
         logger.error(f"Traceback completo: {traceback.format_exc()}")
         return jsonify({
-            "error": str(e),
-            "traceback": traceback.format_exc()
+            "error": "Erro interno durante o processamento de reunião"
         }), 500
 
 
@@ -210,32 +240,34 @@ def process_meeting_file(file_path: Path, participants: str, meeting_date: str, 
     transcript = ""
 
     if file_ext in ['.txt', '.md']:
-        # Text file - read directly
+        # Text file - read directly (limit to 10MB to prevent OOM)
+        max_text_size = 10 * 1024 * 1024  # 10MB
+        file_size = file_path.stat().st_size
+        if file_size > max_text_size:
+            raise ValueError(f"Arquivo de texto muito grande ({file_size / (1024*1024):.1f}MB). Limite: 10MB")
         update_progress(session_id, 25, "Lendo arquivo de texto...")
         with open(file_path, 'r', encoding='utf-8') as f:
             transcript = f.read()
         logger.info("Arquivo de texto lido diretamente")
 
     elif file_ext in ['.mp3', '.wav', '.mp4', '.avi', '.mov', '.m4a']:
-        # Audio/Video file - use Whisper for speech-to-text
+        # Audio/Video file - use Whisper Cloud API
         try:
-            update_progress(session_id, 25, "Carregando modelo e transcrevendo áudio...")
-            logger.info("Iniciando transcrição com Whisper...")
+            update_progress(session_id, 25, "Transcrevendo áudio com Whisper Cloud...")
+            logger.info("Iniciando transcrição com Whisper Cloud API...")
 
-            # Obter modelo Whisper (lazy loading)
-            model = get_whisper_model()
+            # Transcrever usando Whisper Cloud API
+            transcript = transcribe_audio_cloud(file_path, language="pt")
 
-            update_progress(session_id, 30, "Transcrevendo áudio...")
-            result = model.transcribe(str(file_path), language="pt")
-            transcript = result["text"]
             logger.info(f"Transcrição concluída. Tamanho: {len(transcript)} caracteres")
             update_progress(session_id, 50, "Transcrição concluída")
-        except RuntimeError as e:
-            logger.error(f"Erro ao obter modelo Whisper: {e}")
-            transcript = f"[SERVIÇO DE TRANSCRIÇÃO INDISPONÍVEL]\n\nArquivo: {file_path.name}\nErro: {str(e)}\n\nO modelo Whisper não pôde ser carregado. Por favor, contate o administrador do sistema."
+        except ValueError as e:
+            # Arquivo muito grande
+            logger.error(f"Arquivo muito grande para Whisper Cloud: {e}")
+            transcript = f"[ERRO: ARQUIVO MUITO GRANDE]\n\nArquivo: {file_path.name}\n{str(e)}\n\nO limite da API Whisper é 25MB. Por favor, use um arquivo menor ou divida o áudio."
         except Exception as e:
-            logger.error(f"Erro na transcrição Whisper: {e}")
-            transcript = f"[ERRO NA TRANSCRIÇÃO]\n\nArquivo: {file_path.name}\nErro: {str(e)}\n\nPor favor, tente novamente ou use um arquivo de texto."
+            logger.error(f"Erro na transcrição Whisper Cloud: {e}")
+            transcript = f"[ERRO NA TRANSCRIÇÃO]\n\nArquivo: {file_path.name}\nErro: {str(e)}\n\nVerifique se a API Key OpenAI está configurada corretamente."
 
     else:
         # Unknown file type
@@ -249,6 +281,22 @@ def process_meeting_file(file_path: Path, participants: str, meeting_date: str, 
     return summary
 
 
+def _is_error_transcript(transcript: str) -> bool:
+    """Detecta se a transcrição representa uma mensagem de erro."""
+    if not transcript:
+        return True
+
+    stripped = transcript.lstrip()
+    known_error_prefixes = (
+        "[ERRO",
+        "[TIPO",
+        "[MODO",
+        "[DEMONSTRACAO",
+        "[MODO DE DEMONSTRAÇÃO",
+    )
+    return any(stripped.startswith(prefix) for prefix in known_error_prefixes)
+
+
 def generate_meeting_summary(transcript: str, participants: str, meeting_date: str, meeting_title: str, session_id: str) -> str:
     """
     Generate a structured meeting summary in markdown format using OpenAI GPT.
@@ -257,12 +305,16 @@ def generate_meeting_summary(transcript: str, participants: str, meeting_date: s
     formatted_participants = participants if participants else "Participantes não informados"
 
     # Use OpenAI GPT for intelligent summarization if available
-    if openai_client and transcript and not transcript.startswith('['):
+    client = get_openai_client()
+    if client and transcript and not _is_error_transcript(transcript):
         try:
             logger.info("Gerando resumo com OpenAI GPT...")
 
             # Load prompt from file
             prompt_file = APP_ROOT / "prompts" / "prompt_resumo.md"
+            if not prompt_file.exists():
+                logger.warning(f"Prompt file não encontrado: {prompt_file}, usando fallback template")
+                raise FileNotFoundError(f"Prompt file não encontrado: {prompt_file}")
             with open(prompt_file, 'r', encoding='utf-8') as f:
                 prompt_template = f.read()
 
@@ -272,36 +324,32 @@ def generate_meeting_summary(transcript: str, participants: str, meeting_date: s
             prompt = prompt.replace('<<TRANSCRIÇÂO>>', transcript[:4000])
             prompt = prompt.replace(' <<TRANSCRIÇÂO >>', transcript[:4000])
 
-            response = openai_client.chat.completions.create(
-                model=OPENAI_MODEL,
-                messages=[
-                    {"role": "system", "content": "Você é um especialista em resumir reuniões de negócios de forma clara e profissional."},
-                    {"role": "user", "content": prompt}
-                ],
-                max_completion_tokens=4000
-            )
+            models_to_try = get_model_candidates()
 
-            ai_summary = response.choices[0].message.content
-            logger.info("Resumo gerado com sucesso pelo OpenAI GPT")
-            update_progress(session_id, 75, "Resumo gerado com sucesso")
+            for model_name in models_to_try:
+                try:
+                    response = client.chat.completions.create(
+                        model=model_name,
+                        messages=[
+                            {"role": "system", "content": "Você é um especialista em resumir reuniões de negócios de forma clara e profissional."},
+                            {"role": "user", "content": prompt}
+                        ],
+                        max_completion_tokens=4000
+                    )
 
-            # Combine AI summary with metadata
-            summary_md = f"""# {meeting_title}
+                    ai_summary = response.choices[0].message.content
+                    logger.info(f"Resumo gerado com sucesso pelo OpenAI GPT (modelo {model_name})")
+                    update_progress(session_id, 75, "Resumo gerado com sucesso")
 
-**Data:** {formatted_date}
-**Participantes:** {formatted_participants}
+                    # Retornar apenas o resumo da IA (sem header duplicado - já está na capa)
+                    return ai_summary
 
-{ai_summary}
-
----
-
-*Resumo gerado automaticamente com IA em {formatted_date}*
-"""
-
-            return summary_md
+                except Exception as api_error:
+                    logger.error(f"Erro ao gerar resumo com OpenAI (modelo {model_name}): {api_error}")
+                    continue
 
         except Exception as e:
-            logger.error(f"Erro ao gerar resumo com OpenAI: {e}")
+            logger.error(f"Erro inesperado ao preparar o prompt para OpenAI: {e}")
             # Fall back to template-based summary
 
     # Fallback template-based summary
@@ -343,14 +391,3 @@ def generate_meeting_summary(transcript: str, participants: str, meeting_date: s
 """
 
     return summary_md
-
-
-# Pre-loading opcional do modelo Whisper durante startup
-# Configurável via variável de ambiente WHISPER_PRELOAD=true
-if os.getenv('WHISPER_PRELOAD', 'false').lower() == 'true':
-    logger.info("[Startup] WHISPER_PRELOAD=true detectado - carregando modelo Whisper antecipadamente...")
-    try:
-        get_whisper_model()
-        logger.info("[Startup] Modelo Whisper pré-carregado com sucesso!")
-    except Exception as e:
-        logger.error(f"[Startup] Falha ao pré-carregar modelo Whisper: {e}")

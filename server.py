@@ -4,7 +4,13 @@ MDconverter - Aplicação principal
 
 import logging
 import os
+
 from app import create_app
+from config.env_loader import load_env_from_file
+
+
+# Ensure local development picks up variables from .env automatically
+load_env_from_file()
 
 # Configurar logging baseado no ambiente
 log_level = os.environ.get('LOG_LEVEL', 'INFO').upper()

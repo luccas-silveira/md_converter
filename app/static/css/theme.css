@@ -1,0 +1,278 @@
+/* 
+   ZOI Design System - Tokens & Theme (State of the Art)
+   Standards: REM units, A11y, Semantic Tokens, Motion
+   Generated: 2026-01-31
+*/
+
+@import url('https://api.fontshare.com/v2/css?f[]=clash-display@200,300,400,500,600,700&display=swap');
+
+:root {
+  /* --------------------------------------------------------------------------
+     1. Primitive Tokens (Raw Values)
+     -------------------------------------------------------------------------- */
+  
+  /* Colors - Brand */
+  --green-400: #b5ff81;
+  --green-500: #90cc67;
+  --green-900: #364c26;
+  --magenta-500: #cc3366;
+  
+  /* Colors - Neutrals */
+  --neutral-0:   #ffffff;
+  --neutral-50:  #f7fff2;
+  --neutral-100: #e7e7e7;
+  --neutral-200: #cccccc;
+  --neutral-300: #b0b0b0;
+  --neutral-500: #808080;
+  --neutral-600: #5c5c5c;
+  --neutral-700: #3f444b;
+  --neutral-800: #333333;
+  --neutral-850: #33373d;
+  --neutral-900: #141414;
+  
+  /* Colors - System Feedback */
+  --system-error: #e53935;
+  --system-success: #43a047;
+  --system-warning: #fb8c00;
+
+  /* Spacing Scale (REM bases - 1rem = 16px) */
+  --space-1: 0.25rem;  /* 4px */
+  --space-2: 0.5rem;   /* 8px */
+  --space-3: 0.75rem;  /* 12px */
+  --space-4: 1rem;     /* 16px */
+  --space-5: 1.25rem;  /* 20px */
+  --space-6: 1.5rem;   /* 24px */
+  --space-8: 2rem;     /* 32px */
+  --space-10: 2.5rem;  /* 40px */
+  --space-12: 3rem;    /* 48px */
+  --space-20: 5rem;    /* 80px */
+  --space-25: 6.25rem; /* 100px */
+
+  /* Layout */
+  --container-max: 80rem; /* 1280px */
+  --container-padding: var(--space-5);
+  
+  /* Radius */
+  --radius-sm: 0.25rem; /* 4px */
+  --radius-md: 0.75rem; /* 12px */
+  --radius-lg: 1rem;    /* 16px */
+  --radius-full: 9999px;
+
+  /* Typography Families */
+  --font-display: 'Clash Display', -apple-system, sans-serif;
+  --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+
+  /* Motion (Animation) */
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-out: cubic-bezier(0.0, 0, 0.2, 1);
+  --duration-fast: 150ms;
+  --duration-normal: 300ms;
+
+  /* Z-Index Layers */
+  --z-base: 0;
+  --z-sticky: 100;
+  --z-overlay: 1000;
+  --z-modal: 1100;
+
+  /* --------------------------------------------------------------------------
+     2. Semantic Tokens (Design Decisions)
+     -------------------------------------------------------------------------- */
+
+  /* Backgrounds */
+  --bg-page: var(--neutral-0);
+  --bg-surface: var(--neutral-50);
+  --bg-dark: var(--neutral-900);
+  --bg-input: var(--neutral-0);
+  
+  /* Text */
+  --text-primary: var(--neutral-800);
+  --text-secondary: var(--neutral-600);
+  --text-tertiary: var(--neutral-500);
+  --text-inverse: var(--neutral-0);
+  --text-brand: var(--neutral-900);
+
+  /* Actions */
+  --action-primary-bg: var(--green-400);
+  --action-primary-fg: var(--text-brand);
+  --action-primary-hover: var(--green-500);
+  
+  --action-secondary-bg: var(--neutral-900);
+  --action-secondary-fg: var(--neutral-0);
+  --action-secondary-hover: var(--neutral-800);
+
+  /* Borders & Focus */
+  --border-default: var(--neutral-200);
+  --border-active: var(--neutral-800);
+  --focus-ring: 0 0 0 3px rgba(181, 255, 129, 0.5); /* Brand Glow */
+}
+
+/* --------------------------------------------------------------------------
+   3. Global Reset & Base
+   -------------------------------------------------------------------------- */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  background-color: var(--bg-page);
+  color: var(--text-primary);
+  line-height: 1.5;
+  font-size: 1rem; /* 16px base */
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
+  font-weight: 500;
+  line-height: 1.1;
+  margin-top: 0;
+  margin-bottom: var(--space-4);
+  color: var(--text-primary);
+}
+
+p { margin-top: 0; margin-bottom: var(--space-4); }
+
+/* A11y: Focus Visible (Only shows when navigating via keyboard) */
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: var(--radius-sm);
+}
+
+/* --------------------------------------------------------------------------
+   4. Component Classes
+   -------------------------------------------------------------------------- */
+
+/* Container */
+.container {
+  width: 100%;
+  max-width: var(--container-max);
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: var(--container-padding);
+  padding-right: var(--container-padding);
+}
+
+/* Typography Utilities (Responsive using Clamp or REM) */
+.text-display-xl { font-size: 3.5rem;  /* 56px */ letter-spacing: -0.02em; }
+.text-display-lg { font-size: 3rem;    /* 48px */ letter-spacing: -0.01em; }
+.text-display-md { font-size: 2rem;    /* 32px */ }
+.text-body-lg { font-size: 1.25rem;    /* 20px */ }
+.text-body-md { font-size: 1rem;       /* 16px */ }
+.text-body-sm { font-size: 0.875rem;   /* 14px */ }
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 1rem;
+  line-height: 1;
+  padding: var(--space-4) var(--space-6);
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-out),
+              transform var(--duration-fast) var(--ease-out),
+              box-shadow var(--duration-fast) var(--ease-out);
+  user-select: none;
+}
+
+.btn:active { transform: scale(0.98); }
+.btn:disabled { opacity: 0.6; cursor: not-allowed; pointer-events: none; }
+
+.btn-primary {
+  background-color: var(--action-primary-bg);
+  color: var(--action-primary-fg);
+}
+.btn-primary:hover { background-color: var(--action-primary-hover); }
+
+.btn-secondary {
+  background-color: var(--action-secondary-bg);
+  color: var(--action-secondary-fg);
+}
+.btn-secondary:hover { background-color: var(--action-secondary-hover); }
+
+.btn-outline {
+  background-color: transparent;
+  border-color: var(--border-default);
+  color: var(--text-primary);
+}
+.btn-outline:hover {
+  border-color: var(--text-primary);
+  background-color: var(--neutral-50);
+}
+
+.btn-sm {
+  padding: var(--space-2) var(--space-4);
+  font-size: 0.875rem;
+}
+
+/* Forms (New!) */
+.form-group { margin-bottom: var(--space-5); }
+
+.form-label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 500;
+  margin-bottom: var(--space-2);
+  color: var(--text-secondary);
+}
+
+.form-input {
+  display: block;
+  width: 100%;
+  padding: var(--space-3) var(--space-4);
+  font-size: 1rem;
+  font-family: var(--font-body);
+  color: var(--text-primary);
+  background-color: var(--bg-input);
+  background-clip: padding-box;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  transition: border-color var(--duration-fast) var(--ease-out),
+              box-shadow var(--duration-fast) var(--ease-out);
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: var(--green-500);
+  box-shadow: var(--focus-ring);
+}
+
+.form-input::placeholder { color: var(--neutral-300); }
+
+/* Cards */
+.card {
+  background: var(--bg-surface);
+  border-radius: var(--radius-md);
+  padding: var(--space-6);
+  border: 1px solid var(--border-default);
+  transition: transform var(--duration-normal) var(--ease-out);
+}
+.card:hover { transform: translateY(-2px); }
+
+.card-dark {
+  background: var(--bg-dark);
+  color: var(--text-inverse);
+  border: 1px solid var(--neutral-700);
+}
+
+/* Utilities */
+.bg-dark { background-color: var(--bg-dark); color: var(--text-inverse); }
+.text-center { text-align: center; }
+.mb-8 { margin-bottom: var(--space-8); }
+.py-20 { padding-top: var(--space-20); padding-bottom: var(--space-20); }
+
+/* Layout Grid */
+.grid-2 { display: grid; grid-template-columns: 1fr; gap: var(--space-6); }
+.grid-3 { display: grid; grid-template-columns: 1fr; gap: var(--space-6); }
+
+@media (min-width: 768px) {
+  .grid-2 { grid-template-columns: repeat(2, 1fr); }
+  .grid-3 { grid-template-columns: repeat(3, 1fr); }
+}
