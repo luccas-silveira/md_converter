@@ -189,8 +189,8 @@ def md_to_pdf(md_file_path, pdf_file_path=None, css_style=None, logo_path=None, 
         font-family: 'Clash Display', -apple-system, sans-serif;
         background-color: #b5ff81;
         color: #141414;
-        display: inline-block;
-        padding: 5px 14px;
+        display: table;
+        padding: 6px 12px;
         border-radius: 12px;
         border: none;
         margin-top: 28px;
@@ -239,6 +239,7 @@ def md_to_pdf(md_file_path, pdf_file_path=None, css_style=None, logo_path=None, 
         line-height: 1.5;
         font-size: 0.85em;
         page-break-inside: avoid;
+        page-break-after: avoid;
     }
 
     pre code {
@@ -263,15 +264,19 @@ def md_to_pdf(md_file_path, pdf_file_path=None, css_style=None, logo_path=None, 
         border-collapse: collapse;
         width: 100%;
         margin: 16px 0;
-        font-size: 0.92em;
-        page-break-inside: avoid;
+        table-layout: fixed;
+        word-wrap: break-word;
+        page-break-inside: auto;
     }
 
     table th,
     table td {
-        border: 1px solid #e7e7e7;
-        padding: 8px 12px;
+        border: 1px solid #d0d7de;
+        padding: 6px 10px;
         text-align: left;
+        overflow-wrap: break-word;
+        word-break: break-word;
+        font-size: 0.88em;
     }
 
     table th {
@@ -281,6 +286,11 @@ def md_to_pdf(md_file_path, pdf_file_path=None, css_style=None, logo_path=None, 
         font-family: 'Clash Display', -apple-system, sans-serif;
         font-size: 0.92em;
     }
+
+    table tr {
+        page-break-inside: avoid;
+    }
+
 
     table tr:nth-child(even) {
         background-color: #f7fff2;
