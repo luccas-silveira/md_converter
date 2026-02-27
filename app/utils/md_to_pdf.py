@@ -165,7 +165,7 @@ def md_to_pdf(md_file_path, pdf_file_path=None, css_style=None, logo_path=None, 
     h1, h2, h3, h4, h5, h6 {
         background-color: #B5FF81;
         color: #111111;
-        display: inline-block;
+        display: table;
         padding: 6px 12px;
         border-radius: 12px;
         border: none;
@@ -174,6 +174,7 @@ def md_to_pdf(md_file_path, pdf_file_path=None, css_style=None, logo_path=None, 
         font-weight: 600;
         line-height: 1.25;
         page-break-inside: avoid;
+        page-break-after: avoid;
     }
     
     h1 {
@@ -227,20 +228,30 @@ def md_to_pdf(md_file_path, pdf_file_path=None, css_style=None, logo_path=None, 
         border-collapse: collapse;
         width: 100%;
         margin: 16px 0;
+        table-layout: fixed;
+        word-wrap: break-word;
+        page-break-inside: auto;
     }
-    
+
     table th,
     table td {
         border: 1px solid #d0d7de;
-        padding: 8px 12px;
+        padding: 6px 10px;
         text-align: left;
+        overflow-wrap: break-word;
+        word-break: break-word;
+        font-size: 0.88em;
     }
-    
+
     table th {
         background-color: #f6f8fa;
         font-weight: 600;
     }
-    
+
+    table tr {
+        page-break-inside: avoid;
+    }
+
     table tr:nth-child(even) {
         background-color: #f9f9f9;
     }
