@@ -46,4 +46,4 @@ ENV FLASK_ENV=production \
 EXPOSE 5000
 
 # Usar gunicorn em produção, lendo variáveis de ambiente
-CMD ["sh", "-lc", "exec gunicorn -b 0.0.0.0:5000 server:app --workers ${WORKERS:-1} --threads ${THREADS:-2} --timeout ${TIMEOUT:-300} ${PRELOAD:+--preload} --access-logfile ${ACCESS_LOG:--} --error-logfile ${ERROR_LOG:--}"]
+CMD ["sh", "-lc", "exec gunicorn -b 0.0.0.0:5000 server:app --workers ${WORKERS:-2} --threads ${THREADS:-2} --timeout ${TIMEOUT:-600} --max-requests 200 --max-requests-jitter 30 ${PRELOAD:+--preload} --access-logfile ${ACCESS_LOG:--} --error-logfile ${ERROR_LOG:--}"]

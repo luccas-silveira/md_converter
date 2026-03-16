@@ -11,6 +11,8 @@ services:
       - LOG_LEVEL=INFO
       - MAX_CONTENT_LENGTH=1073741824  # 1GB
       - UPLOAD_FOLDER=/data/uploads
+      - WORKERS=2        # 2 workers: um pode processar PDF pesado enquanto o outro atende healthcheck/outras requests
+      - TIMEOUT=600      # 10min para PDFs grandes / transcrições longas
     env_file:
       - .env
     restart: unless-stopped
