@@ -8,6 +8,6 @@ main_bp = Blueprint('main', __name__)
 
 @main_bp.route("/")
 def index():
-    """Página principal da aplicação"""
+    """Renderiza a SPA principal e informa ao frontend o limite atual de upload."""
     max_size_mb = int(current_app.config.get('MAX_CONTENT_LENGTH', 100 * 1024 * 1024) / (1024 * 1024))
     return render_template('front.html', max_size_mb=max_size_mb)

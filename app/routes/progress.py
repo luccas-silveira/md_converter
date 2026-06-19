@@ -1,23 +1,28 @@
 """
-Rotas para monitoramento de progresso via Server-Sent Events
+Rotas para monitoramento de progresso via Server-Sent Events.
+
+O estado é mantido em memória no processo atual. Isso é suficiente para o
+frontend local e para o Compose padrão com `WORKERS=1`, mas não cria
+sincronização entre múltiplos workers.
 """
 
 from flask import Blueprint, Response
 import threading
 import time
 import logging
+import json
 
 logger = logging.getLogger(__name__)
 
 progress_bp = Blueprint('progress', __name__)
 
-# Progress tracking
+# Estado efêmero por processo, indexado por session_id.
 progress_data = {}
 progress_lock = threading.Lock()
 
 
 def update_progress(session_id: str, percentage: int, message: str):
-    """Update progress for a specific session"""
+    """Atualiza o progresso de uma sessão no armazenamento em memória."""
     with progress_lock:
         progress_data[session_id] = {
             'percentage': percentage,
@@ -28,35 +33,34 @@ def update_progress(session_id: str, percentage: int, message: str):
 
 
 def get_progress(session_id: str):
-    """Get progress for a specific session"""
+    """Recupera o progresso atual de uma sessão."""
     with progress_lock:
         return progress_data.get(session_id)
 
 
 @progress_bp.route('/progress/<session_id>')
 def progress_stream(session_id):
-    """Server-Sent Events endpoint for progress updates"""
+    """Mantém um stream SSE simples com o progresso calculado pelo backend."""
     def generate():
-        # Initialize with 0% if no progress exists yet
+        # Garante um payload inicial mesmo quando o POST ainda não atualizou a sessão.
         if not get_progress(session_id):
             update_progress(session_id, 0, "Conectando...")
 
         start_time = time.time()
-        timeout = 300  # 5 minutes timeout
+        timeout = 300  # timeout em segundos para conexões esquecidas
 
         while True:
-            # Check timeout
+            # Fecha streams órfãos para evitar manter conexões abertas indefinidamente.
             if time.time() - start_time > timeout:
                 logger.warning(f"SSE connection timeout for session {session_id}")
                 break
 
             progress = get_progress(session_id)
             if progress:
-                yield f"data: {{'percentage': {progress['percentage']}, 'message': '{progress['message']}'}}\n\n"
+                yield f"data: {json.dumps({'percentage': progress['percentage'], 'message': progress['message']}, ensure_ascii=False)}\n\n"
 
-                # If completed, stop streaming
+                # Ao concluir, limpa o estado efêmero da sessão.
                 if progress['percentage'] >= 100:
-                    # Clean up old progress data
                     with progress_lock:
                         if session_id in progress_data:
                             del progress_data[session_id]
