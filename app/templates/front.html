@@ -145,7 +145,7 @@ Seu conteúdo em Markdown aqui...
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">Arquivo da reunião:</label>
                         <div id="meeting-upload-area" class="relative border-2 border-dashed border-gray-200 rounded-2xl p-8 text-center cursor-pointer transition-all duration-300 hover:border-gray-300 hover:bg-gray-50">
-                            <input type="file" id="meeting-file-input" accept=".mp3,.wav,.mp4,.avi,.mov,.txt,.docx,.pdf" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
+                            <input type="file" id="meeting-file-input" accept=".mp3,.wav,.mp4,.avi,.mov,.m4a,.txt,.md" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
 
                             <!-- Default State -->
                             <div id="meeting-upload-default" class="flex flex-col items-center">
@@ -159,7 +159,7 @@ Seu conteúdo em Markdown aqui...
                                     Selecionar arquivo
                                 </h4>
                                 <p class="text-sm text-gray-500">
-                                    Áudio, vídeo ou transcrição (MP3, MP4, TXT, etc.)
+                                    Áudio, vídeo ou transcrição (MP3, WAV, MP4, TXT, MD, M4A)
                                 </p>
                             </div>
 
@@ -225,7 +225,13 @@ Seu conteúdo em Markdown aqui...
 
             <!-- Cover Form -->
             <div id="cover-form" class="mb-8 hidden w-full">
-                <label class="block text-sm font-medium text-gray-700 mb-3">Informações da capa</label>
+                <div class="flex items-center justify-between mb-3">
+                    <label class="block text-sm font-medium text-gray-700">Informações da capa</label>
+                    <button id="gen-cover-btn" type="button" class="text-sm font-medium px-3 py-1.5 rounded-lg bg-brand-green text-brand-black hover:opacity-90 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed">
+                        ✨ Gerar com IA
+                    </button>
+                </div>
+                <p id="gen-cover-status" class="text-xs mb-3 hidden"></p>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
                     <div class="md:col-span-2">
                         <label class="block text-xs text-gray-600 mb-1">Subtítulo (abaixo de ‘Relatório’)</label>
@@ -364,6 +370,13 @@ Seu conteúdo em Markdown aqui...
                                  (currentInputMode === 'text' && markdownText.value.trim()) ||
                                  (currentInputMode === 'meeting' && selectedMeetingFile);
                 setConvertEnabled(hasContent);
+                // Botão de IA só faz sentido com um documento de texto (modos file/text).
+                const genBtn = document.getElementById('gen-cover-btn');
+                if (genBtn) {
+                    const canGenerate = (currentInputMode === 'file' && selectedFile) ||
+                                        (currentInputMode === 'text' && markdownText.value.trim());
+                    genBtn.disabled = !canGenerate;
+                }
             }
 
             function resetAll() {
@@ -647,6 +660,61 @@ Seu conteúdo em Markdown aqui...
 
                 xhr.send(form);
             });
+
+            // Gerar capa com IA (opt-in): lê o documento da aba ativa e preenche
+            // subtítulo/descrição para o usuário revisar antes de converter.
+            const genCoverBtn = document.getElementById('gen-cover-btn');
+            const genCoverStatus = document.getElementById('gen-cover-status');
+
+            function setGenStatus(msg, ok) {
+                if (!genCoverStatus) return;
+                if (!msg) { genCoverStatus.classList.add('hidden'); return; }
+                genCoverStatus.textContent = msg;
+                genCoverStatus.classList.remove('hidden', 'text-red-600', 'text-gray-500');
+                genCoverStatus.classList.add(ok ? 'text-gray-500' : 'text-red-600');
+            }
+
+            function getDocumentText() {
+                if (currentInputMode === 'text') {
+                    return Promise.resolve(markdownText.value.trim());
+                }
+                if (currentInputMode === 'file' && selectedFile) {
+                    return selectedFile.text();
+                }
+                return Promise.resolve('');
+            }
+
+            if (genCoverBtn) {
+                genCoverBtn.addEventListener('click', async () => {
+                    if (genCoverBtn.disabled) return;
+                    const original = genCoverBtn.textContent;
+                    genCoverBtn.disabled = true;
+                    genCoverBtn.textContent = 'Gerando...';
+                    setGenStatus('Analisando o documento...', true);
+                    try {
+                        const docText = await getDocumentText();
+                        if (!docText) { setGenStatus('Documento vazio.', false); return; }
+                        const form = new FormData();
+                        form.append('document', docText);
+                        const resp = await fetch('/relatorio/suggest-cover', { method: 'POST', body: form });
+                        const data = await resp.json();
+                        if (!resp.ok) {
+                            setGenStatus(data.error || 'Não foi possível gerar.', false);
+                            return;
+                        }
+                        const sub = document.getElementById('cover_subtitulo');
+                        const desc = document.getElementById('cover_descricao');
+                        if (sub && data.subtitulo) sub.value = data.subtitulo;
+                        if (desc && data.descricao) desc.value = data.descricao;
+                        setGenStatus('Pronto — revise os textos abaixo.', true);
+                    } catch (e) {
+                        setGenStatus('Falha de rede ao gerar.', false);
+                    } finally {
+                        genCoverBtn.textContent = original;
+                        genCoverBtn.disabled = false;
+                    }
+                });
+            }
 
             // New file
             newFileBtn.addEventListener('click', (e) => { e.preventDefault(); resetAll(); });

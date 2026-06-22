@@ -1,5 +1,8 @@
 """
-Rotas para conversão de Markdown para PDF
+Rotas HTTP para conversão de Markdown em PDF.
+
+Este módulo atende tanto o upload direto de arquivo quanto o texto colado no
+frontend, já que ambos chegam ao backend como um arquivo multipart.
 """
 
 from flask import Blueprint, request, send_file, abort, jsonify, current_app
@@ -15,12 +18,13 @@ from app.routes.progress import update_progress
 conversion_bp = Blueprint('conversion', __name__)
 logger = logging.getLogger(__name__)
 
-# Get application root
+# Diretório raiz do projeto para resolver assets compartilhados.
 APP_ROOT = Path(__file__).resolve().parent.parent.parent
 
 
 @conversion_bp.route("/convert-md", methods=["POST"])
 def convert_md():
+    """Recebe um arquivo textual, aplica dados opcionais de capa e devolve um PDF."""
     session_id = request.form.get('session_id', str(uuid.uuid4()))
     try:
         logger.info("=== INICIO DA CONVERSÃO ===")
@@ -44,7 +48,7 @@ def convert_md():
         css_text = request.form.get("css") or None
         update_progress(session_id, 25, "Preparando configurações...")
 
-        # Dados da capa vindos do formulário do front-end
+        # Campos suportados tanto pela UI quanto por clientes externos da API.
         cover_data = {
             'topo_direito_email': request.form.get('cover_top_email', ''),
             'topo_direito_site': request.form.get('cover_top_site', ''),
@@ -62,7 +66,7 @@ def convert_md():
 
         logo_file = request.files.get("logo")
 
-        # Usar diretório de upload configurável (persistente em produção)
+        # Usa o diretório configurado para suportar temporários persistentes no Docker.
         upload_base = current_app.config.get('UPLOAD_FOLDER', '/tmp')
         with tempfile.TemporaryDirectory(dir=upload_base) as tmpdir:
             tmpdir_path = Path(tmpdir)
@@ -96,7 +100,7 @@ def convert_md():
             logger.info(f"Logo ZOI existe: {logo_zoi.exists()}")
             logger.info(f"Capa mockup existe: {capa_mockup.exists()}")
 
-            # Use o diretório do projeto como base para resolver fonts/ e logo_zoi.png
+            # Resolve capa, logo e fontes a partir da raiz do projeto.
             logger.info("Iniciando conversão MD -> PDF")
             update_progress(session_id, 60, "Convertendo para PDF...")
             md_to_pdf(

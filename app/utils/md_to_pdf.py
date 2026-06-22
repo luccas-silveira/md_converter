@@ -1,3 +1,10 @@
+"""
+Utilitário de conversão de Markdown para PDF usado pela web e pela CLI.
+
+Além da transformação Markdown → HTML → PDF, este módulo centraliza o layout
+do relatório, a lógica de descoberta de assets e a geração opcional de capa.
+"""
+
 import markdown2
 import os
 import re
@@ -7,7 +14,7 @@ from pathlib import Path
 
 def normalize_markdown_content(content):
     """
-    Normaliza o conteúdo markdown para garantir formatação correta.
+    Normaliza o Markdown antes da renderização.
 
     Corrige problemas como:
     - Títulos sem linha em branco antes
@@ -37,9 +44,9 @@ def md_to_pdf(md_file_path, pdf_file_path=None, css_style=None, logo_path=None, 
         md_file_path (str): Caminho do arquivo Markdown de entrada
         pdf_file_path (str): Caminho do arquivo PDF de saída (opcional)
         css_style (str): CSS personalizado para estilização (opcional)
-        logo_path (str): Caminho para imagem da logo a exibir no rodapé (opcional). Se não informado, tenta usar 'logo_zoi.png' ao lado do .md ou no diretório base.
-        base_dir (str|Path): Diretório base para recursos (imagens, fonts/). Se None, usa o diretório do arquivo .md.
-        cover_data (dict): Dados para a capa (ex.: subtitulo, descricao, topo_direito_email, topo_direito_site, representante_nome, preparado_nome, preparado_email, preparado_phone, data).
+        logo_path (str): Caminho para imagem da logo a exibir no rodapé (opcional). Se não informado, tenta usar `logo_zoi.png` ao lado do Markdown ou em `assets/images/`.
+        base_dir (str|Path): Diretório base para recursos. Quando informado, o módulo resolve capa em `assets/images/` e fontes em `assets/fonts/`.
+        cover_data (dict): Dados da capa, como subtítulo, descrição, contatos e data.
         cover_template_path (str): Caminho para a imagem da capa em branco (mockup). Se None, tenta localizar automaticamente.
     
     Returns:
@@ -53,10 +60,10 @@ def md_to_pdf(md_file_path, pdf_file_path=None, css_style=None, logo_path=None, 
     if pdf_file_path is None:
         pdf_file_path = Path(md_file_path).with_suffix('.pdf')
     
-    # Diretório base para resolução de recursos
+    # Diretório base usado para resolver logo, fontes e mockup de capa.
     resolved_base_dir = Path(base_dir).resolve() if base_dir else Path(md_file_path).resolve().parent
 
-    # Se logo não for informada, tentar logo_zoi.png ao lado do .md e no assets/images
+    # Se logo não for informada, tenta o arquivo ao lado do Markdown e depois em assets/images.
     if logo_path is None:
         candidates = [
             Path(md_file_path).with_name('logo_zoi.png'),
@@ -68,7 +75,7 @@ def md_to_pdf(md_file_path, pdf_file_path=None, css_style=None, logo_path=None, 
                 logo_path = str(cand)
                 break
     
-    # Ler o conteúdo do arquivo Markdown
+    # Lê e normaliza o Markdown antes de repassar ao markdown2.
     with open(md_file_path, 'r', encoding='utf-8') as file:
         md_content = file.read()
 
@@ -90,7 +97,7 @@ def md_to_pdf(md_file_path, pdf_file_path=None, css_style=None, logo_path=None, 
         ]
     )
     
-    # CSS padrão para melhor formatação
+    # CSS padrão compartilhado pela interface web e pela CLI.
     default_css = """
     @page {
         size: A4;
@@ -132,19 +139,26 @@ def md_to_pdf(md_file_path, pdf_file_path=None, css_style=None, logo_path=None, 
     .cover-top-right {
         position: absolute; top: 30mm; right: 22mm; width: 75mm;
         color: #111; font-size: 10pt; line-height: 1.35; text-align: left;
+        overflow-wrap: break-word; word-break: break-word;
         font-family: 'Satoshi', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     }
     .cover-top-right .label { color: #333; font-weight: 600; }
-    /* Subtítulo abaixo do "Relatório" no mockup */
-    .cover-title-sub {
+    /* Bloco de título + descrição abaixo do "Relatório" no mockup.
+       Posiciona o conjunto uma única vez; os filhos fluem normalmente,
+       então a descrição sempre fica abaixo do subtítulo, independente de
+       quantas linhas o subtítulo ocupe (evita sobreposição). */
+    .cover-headblock {
         position: absolute; left: 26mm; top: 126mm; width: 120mm;
-        color: #111; font-size: 16pt; font-weight: 700; line-height: 1.2; text-align: left; margin: 0;
+        text-align: left;
         font-family: 'Satoshi', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     }
+    .cover-title-sub {
+        color: #111; font-size: 16pt; font-weight: 700; line-height: 1.2; margin: 0;
+        overflow-wrap: break-word; word-break: break-word;
+    }
     .cover-desc {
-        position: absolute; left: 26mm; top: 134mm; width: 120mm;
-        color: #555; font-size: 10.5pt; line-height: 1.35; text-align: left; margin: 0;
-        font-family: 'Satoshi', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        color: #555; font-size: 10.5pt; line-height: 1.35; margin: 3mm 0 0 0;
+        overflow-wrap: break-word; word-break: break-word;
     }
     /* Blocos na faixa verde inferior */
     .cover-prep { position: absolute; left: 14mm; bottom: 39mm; width: 120mm; color: #111; text-align: left; font-family: 'Satoshi', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
@@ -314,11 +328,11 @@ def md_to_pdf(md_file_path, pdf_file_path=None, css_style=None, logo_path=None, 
     }
     """
     
-    # Usar CSS padrão e, se houver, anexar CSS personalizado para sobrescrever o padrão
+    # CSS customizado é concatenado ao final para sobrescrever o padrão.
     css_to_use = f"{default_css}\n{css_style}" if css_style else default_css
 
-    # Fonte customizada: procurar arquivos na pasta 'fonts' ao lado do .md
-    fonts_dir = resolved_base_dir / 'fonts'
+    # As fontes locais são resolvidas em `assets/fonts/` relativos ao diretório base.
+    fonts_dir = resolved_base_dir / 'assets' / 'fonts'
 
     def _find_font(fonts_dir: Path, name_candidates):
         if not fonts_dir.is_dir():
@@ -326,6 +340,7 @@ def md_to_pdf(md_file_path, pdf_file_path=None, css_style=None, logo_path=None, 
         exts = ['.woff2', '.woff', '.ttf', '.otf']
         files = list(fonts_dir.glob('*'))
         for cand in name_candidates:
+            cand = cand.lower()
             for f in files:
                 if not f.is_file():
                     continue
@@ -334,7 +349,7 @@ def md_to_pdf(md_file_path, pdf_file_path=None, css_style=None, logo_path=None, 
         return None
 
     clash_file = _find_font(fonts_dir, ['clash'])
-    Satoshi_file = _find_font(fonts_dir, ['Satoshi'])
+    Satoshi_file = _find_font(fonts_dir, ['satoshi'])
 
     fonts_css_parts = []
     if clash_file:
@@ -361,7 +376,7 @@ def md_to_pdf(md_file_path, pdf_file_path=None, css_style=None, logo_path=None, 
         )
 
     if fonts_css_parts:
-        # Aplicar as famílias detectadas: Satoshi no corpo, Clash nos títulos
+        # Quando há fontes detectadas, o CSS passa a nomeá-las explicitamente.
         fonts_css_parts.append(
             """
             body { font-family: 'Satoshi', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
@@ -370,10 +385,10 @@ def md_to_pdf(md_file_path, pdf_file_path=None, css_style=None, logo_path=None, 
         )
         css_to_use = f"{css_to_use}\n{''.join(fonts_css_parts)}"
     
-    # Elemento de rodapé (logo) como running element para @page @bottom-left
+    # Usa running element para renderizar a logo no margin box inferior esquerdo.
     footer_logo_html = f"<div class=\"footer-left\"><img src=\"{logo_path}\" alt=\"logo\"></div>" if logo_path else ""
 
-    # Construir capa, se houver template
+    # Monta a capa apenas quando o mockup base está disponível.
     def _find_cover_template():
         if cover_template_path and Path(cover_template_path).exists():
             return str(cover_template_path)
@@ -383,7 +398,7 @@ def md_to_pdf(md_file_path, pdf_file_path=None, css_style=None, logo_path=None, 
             resolved_base_dir / 'assets' / 'images' / 'capa-mockup.jpg',
             resolved_base_dir / 'assets' / 'images' / 'capa.png',
             resolved_base_dir / 'assets' / 'images' / 'capa.jpg',
-            # Fallbacks para compatibilidade
+            # Fallbacks legados preservados por compatibilidade.
             resolved_base_dir / 'capa mockup.jpg',
             resolved_base_dir / 'capa_mockup.jpg',
             resolved_base_dir / 'capa-mockup.jpg',
@@ -422,8 +437,10 @@ def md_to_pdf(md_file_path, pdf_file_path=None, css_style=None, logo_path=None, 
                 {rep_label_html}
                 <div>{rep_nome}</div>
             </div>
-            <div class=\"cover-title-sub\">{subtitulo}</div>
-            <div class=\"cover-desc\">{descricao}</div>
+            <div class=\"cover-headblock\">
+                <div class=\"cover-title-sub\">{subtitulo}</div>
+                <div class=\"cover-desc\">{descricao}</div>
+            </div>
             <div class=\"cover-prep\">
                 <span class=\"name\">{prep_nome}</span>
                 <div class=\"contact\">{prep_email}</div>
@@ -434,7 +451,7 @@ def md_to_pdf(md_file_path, pdf_file_path=None, css_style=None, logo_path=None, 
         <div style=\"page-break-after: always;\"></div>
         """
 
-    # Criar o HTML completo
+    # HTML final embutido, com CSS inline e base_url para resolução de assets.
     full_html = f"""
     <!DOCTYPE html>
     <html>
@@ -453,7 +470,7 @@ def md_to_pdf(md_file_path, pdf_file_path=None, css_style=None, logo_path=None, 
     </html>
     """
     
-    # Converter HTML para PDF
+    # A escrita final em PDF é responsabilidade do WeasyPrint.
     html = HTML(string=full_html, base_url=str(resolved_base_dir))
     html.write_pdf(pdf_file_path)
     
@@ -463,7 +480,7 @@ def md_to_pdf(md_file_path, pdf_file_path=None, css_style=None, logo_path=None, 
 
 def batch_convert(directory, output_dir=None, css_style=None, logo_path=None):
     """
-    Converte todos os arquivos .md em um diretório para PDF.
+    Converte todos os arquivos `.md` de um diretório para PDF.
     
     Args:
         directory (str): Diretório contendo arquivos .md
@@ -476,12 +493,12 @@ def batch_convert(directory, output_dir=None, css_style=None, logo_path=None):
     if not directory.is_dir():
         raise ValueError(f"'{directory}' não é um diretório válido")
     
-    # Criar diretório de saída se especificado
+    # Cria o diretório de saída apenas quando o usuário pediu um destino separado.
     if output_dir:
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
     
-    # Encontrar todos os arquivos .md
+    # O modo em lote percorre apenas os Markdown do diretório imediato.
     md_files = list(directory.glob('*.md'))
     
     if not md_files:
@@ -490,7 +507,7 @@ def batch_convert(directory, output_dir=None, css_style=None, logo_path=None):
     
     print(f"Encontrados {len(md_files)} arquivos .md para converter")
     
-    # Converter cada arquivo
+    # Cada arquivo reaproveita a mesma rotina `md_to_pdf`.
     for md_file in md_files:
         try:
             if output_dir:
@@ -504,6 +521,7 @@ def batch_convert(directory, output_dir=None, css_style=None, logo_path=None):
 
 
 def main():
+    """Interface CLI simples para uso manual do conversor."""
     parser = argparse.ArgumentParser(
         description='Converte arquivos Markdown (.md) para PDF',
         formatter_class=argparse.RawDescriptionHelpFormatter,

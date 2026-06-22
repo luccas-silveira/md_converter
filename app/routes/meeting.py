@@ -1,5 +1,8 @@
 """
-Rotas para processamento de reuniões e geração de resumos
+Rotas para processamento de reuniões e geração de resumos em PDF.
+
+O fluxo tenta usar Whisper para transcrição e OpenAI para síntese. Se uma dessas
+integrações não estiver disponível, o endpoint ainda gera um resumo padrão.
 """
 
 from flask import Blueprint, request, send_file, abort, jsonify, current_app
@@ -18,10 +21,10 @@ from app.routes.progress import update_progress
 meeting_bp = Blueprint('meeting', __name__)
 logger = logging.getLogger(__name__)
 
-# Get application root
+# Diretório raiz do projeto para prompt, logo e imagem de capa.
 APP_ROOT = Path(__file__).resolve().parent.parent.parent
 
-# Configurar OpenAI API e modelo
+# Cliente OpenAI opcional: a rota funciona sem ele, mas perde o resumo com IA.
 openai_api_key = os.getenv('OPENAI_API_KEY')
 OPENAI_MODEL = os.getenv('OPENAI_MODEL', 'gpt-4o-mini')
 if openai_api_key:
@@ -31,7 +34,7 @@ else:
     openai_client = None
     logger.warning("OPENAI_API_KEY não encontrada - usando modo de demonstração")
 
-# Carregar modelo Whisper (nome via env)
+# O modelo Whisper é carregado no import para evitar re-load a cada request.
 try:
     whisper_model_name = os.getenv('WHISPER_MODEL', 'base')
     whisper_model = whisper.load_model(whisper_model_name)
@@ -43,6 +46,7 @@ except Exception as e:
 
 @meeting_bp.route("/process-meeting", methods=["POST"])
 def process_meeting():
+    """Processa texto/áudio/vídeo de reunião e retorna um PDF com o resumo."""
     session_id = request.form.get('session_id', str(uuid.uuid4()))
     try:
         logger.info("=== INICIO DO PROCESSAMENTO DE REUNIÃO ===")
@@ -57,7 +61,7 @@ def process_meeting():
         logger.info(f"Arquivo de reunião recebido: {filename}")
         logger.info(f"Tipo de conteúdo: {meeting_file.content_type}")
 
-        # Meeting metadata
+        # Metadados usados tanto no resumo quanto na capa do PDF.
         participants = request.form.get('meeting_participants', '')
         meeting_date = request.form.get('meeting_date', '')
         meeting_title = request.form.get('meeting_title', '') or 'Resumo de Reunião'
@@ -66,7 +70,7 @@ def process_meeting():
         logger.info(f"Data: {meeting_date}")
         logger.info(f"Título: {meeting_title}")
 
-        # Cover data from form
+        # No fluxo de reunião, subtítulo e descrição da capa são derivados da reunião.
         cover_data = {
             'topo_direito_email': request.form.get('cover_top_email', ''),
             'topo_direito_site': request.form.get('cover_top_site', ''),
@@ -90,7 +94,7 @@ def process_meeting():
             meeting_file.save(meeting_path)
             logger.info(f"Arquivo de reunião salvo em: {meeting_path}")
 
-            # Process the meeting file and generate markdown summary
+            # Gera um Markdown intermediário antes de reaproveitar o mesmo gerador de PDF.
             update_progress(session_id, 15, "Processando arquivo de reunião...")
             summary_md = process_meeting_file(meeting_path, participants, meeting_date, meeting_title, session_id)
 
@@ -142,24 +146,28 @@ def process_meeting():
 
 def process_meeting_file(file_path: Path, participants: str, meeting_date: str, meeting_title: str, session_id: str) -> str:
     """
-    Process meeting file and generate markdown summary using AI.
+    Processa um arquivo de reunião e devolve o resumo final em Markdown.
+
+    Tipos aceitos atualmente:
+    - texto: `.txt`, `.md`
+    - mídia: `.mp3`, `.wav`, `.mp4`, `.avi`, `.mov`, `.m4a`
     """
     logger.info(f"Processando arquivo de reunião: {file_path}")
 
-    # Extract file extension to determine file type
+    # Determina se o fluxo lê texto diretamente ou dispara transcrição.
     file_ext = file_path.suffix.lower()
 
     transcript = ""
 
     if file_ext in ['.txt', '.md']:
-        # Text file - read directly
+        # Texto pronto: sem Whisper.
         update_progress(session_id, 25, "Lendo arquivo de texto...")
         with open(file_path, 'r', encoding='utf-8') as f:
             transcript = f.read()
         logger.info("Arquivo de texto lido diretamente")
 
     elif file_ext in ['.mp3', '.wav', '.mp4', '.avi', '.mov', '.m4a']:
-        # Audio/Video file - use Whisper for speech-to-text
+        # Áudio/vídeo: depende do modelo Whisper carregado no boot.
         if whisper_model:
             try:
                 update_progress(session_id, 25, "Transcrevendo áudio...")
@@ -176,11 +184,11 @@ def process_meeting_file(file_path: Path, participants: str, meeting_date: str, 
             logger.warning("Whisper não disponível para transcrição")
 
     else:
-        # Unknown file type
+        # Mantém o retorno em Markdown mesmo em caso de formato não suportado.
         transcript = f"[TIPO DE ARQUIVO NÃO SUPORTADO]\n\nTipo de arquivo: {file_ext}\n\nFormatos suportados: .txt, .md, .mp3, .wav, .mp4, .avi, .mov, .m4a"
         logger.warning(f"Tipo de arquivo não suportado: {file_ext}")
 
-    # Generate markdown summary using AI
+    # A etapa final sempre produz Markdown, com IA ou com template fallback.
     update_progress(session_id, 60, "Gerando resumo com IA...")
     summary = generate_meeting_summary(transcript, participants, meeting_date, meeting_title, session_id)
 
@@ -189,17 +197,21 @@ def process_meeting_file(file_path: Path, participants: str, meeting_date: str, 
 
 def generate_meeting_summary(transcript: str, participants: str, meeting_date: str, meeting_title: str, session_id: str) -> str:
     """
-    Generate a structured meeting summary in markdown format using OpenAI GPT.
+    Gera um resumo estruturado em Markdown.
+
+    Quando a OpenAI está configurada, usa `prompts/prompt_resumo.md` e envia
+    até os primeiros 4000 caracteres da transcrição. Em caso de falha, volta
+    para um template estático que preserva o restante do fluxo.
     """
     formatted_date = meeting_date if meeting_date else "Data não informada"
     formatted_participants = participants if participants else "Participantes não informados"
 
-    # Use OpenAI GPT for intelligent summarization if available
+    # Só chama a OpenAI quando há cliente configurado e a transcrição é utilizável.
     if openai_client and transcript and not transcript.startswith('['):
         try:
             logger.info("Gerando resumo com OpenAI GPT...")
 
-            # Load prompt from file
+            # O prompt fica versionado no repositório para facilitar ajustes editoriais.
             prompt_file = APP_ROOT / "prompts" / "prompt_resumo.md"
             with open(prompt_file, 'r', encoding='utf-8') as f:
                 prompt_template = f.read()
@@ -223,7 +235,7 @@ def generate_meeting_summary(transcript: str, participants: str, meeting_date: s
             logger.info("Resumo gerado com sucesso pelo OpenAI GPT")
             update_progress(session_id, 75, "Resumo gerado com sucesso")
 
-            # Combine AI summary with metadata
+            # O PDF final parte deste Markdown intermediário.
             summary_md = f"""# {meeting_title}
 
 **Data:** {formatted_date}
@@ -240,9 +252,9 @@ def generate_meeting_summary(transcript: str, participants: str, meeting_date: s
 
         except Exception as e:
             logger.error(f"Erro ao gerar resumo com OpenAI: {e}")
-            # Fall back to template-based summary
+            # Qualquer falha na OpenAI cai para o template padrão abaixo.
 
-    # Fallback template-based summary
+    # Template padrão para quando IA ou transcrição não estão disponíveis.
     logger.info("Usando template padrão para resumo")
 
     summary_md = f"""# {meeting_title}

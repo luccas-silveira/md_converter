@@ -242,3 +242,9 @@ instance/
 
 /ops
 
+# graphify - commit outputs (graph.json/html, GRAPH_REPORT.md), ignore run-state
+graphify-out/cache/
+graphify-out/.graphify_*
+graphify-out/cost.json
+graphify-out/manifest.json
+

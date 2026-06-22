@@ -1,6 +1,9 @@
 """
-MDconverter - Aplicação Flask para conversão de Markdown para PDF
-e processamento de resumos de reuniões com IA.
+Application factory do MD Converter.
+
+Centraliza o boot da aplicação Flask, registra os blueprints sob o prefixo
+`/relatorio` e mantém o módulo de reunião opcional: se o carregamento do
+Whisper/OpenAI falhar, o restante da aplicação continua disponível.
 """
 
 from flask import Flask, jsonify
@@ -9,10 +12,10 @@ from pathlib import Path
 import os
 
 def create_app():
-    """Factory function para criar a aplicação Flask"""
+    """Cria a aplicação Flask usando variáveis de ambiente como fonte de verdade."""
     app = Flask(__name__)
 
-    # Configurações (agora via variáveis de ambiente com defaults)
+    # Configuração efetiva do runtime: a factory lê o ambiente diretamente.
     app.config['MAX_CONTENT_LENGTH'] = int(os.environ.get('MAX_CONTENT_LENGTH', 1024 * 1024 * 1024))
     app.config['UPLOAD_FOLDER'] = os.environ.get('UPLOAD_FOLDER', '/tmp')
     app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-key-change-in-production')
@@ -27,16 +30,18 @@ def create_app():
         # Evitar falhar no boot por permissão; logs via servidor
         pass
 
-    # Registrar blueprints/rotas com prefixo /relatorio
+    # Todas as rotas públicas da aplicação ficam sob /relatorio.
     from app.routes.main import main_bp
     from app.routes.conversion import conversion_bp
     from app.routes.progress import progress_bp
+    from app.routes.cover_ai import cover_ai_bp
 
     app.register_blueprint(main_bp, url_prefix='/relatorio')
     app.register_blueprint(conversion_bp, url_prefix='/relatorio')
     app.register_blueprint(progress_bp, url_prefix='/relatorio')
+    app.register_blueprint(cover_ai_bp, url_prefix='/relatorio')
 
-    # Importar módulo de reunião condicionalmente
+    # O módulo de reunião depende de Whisper/OpenAI e pode falhar sem derrubar o app.
     try:
         from app.routes.meeting import meeting_bp
         app.register_blueprint(meeting_bp, url_prefix='/relatorio')
@@ -45,7 +50,7 @@ def create_app():
         print(f"⚠️  Módulo de reunião não carregado: {e}")
         print("   A aplicação continuará funcionando sem recursos de IA")
 
-    # Error handlers
+    # Handlers JSON simples para a UI e para clientes da API HTTP.
     @app.errorhandler(413)
     def handle_file_too_large(e):
         max_mb = int(app.config.get('MAX_CONTENT_LENGTH', 0) / (1024 * 1024))
@@ -78,7 +83,7 @@ def create_app():
             "max_size_mb": max_mb
         }, 413
 
-    # Healthcheck leve
+    # Healthcheck leve usado tanto localmente quanto pelo Docker Compose.
     @app.get('/relatorio/healthz')
     def healthz():
         return jsonify({"status": "ok"}), 200
