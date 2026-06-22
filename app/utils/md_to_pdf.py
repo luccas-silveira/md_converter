@@ -139,19 +139,26 @@ def md_to_pdf(md_file_path, pdf_file_path=None, css_style=None, logo_path=None, 
     .cover-top-right {
         position: absolute; top: 30mm; right: 22mm; width: 75mm;
         color: #111; font-size: 10pt; line-height: 1.35; text-align: left;
+        overflow-wrap: break-word; word-break: break-word;
         font-family: 'Satoshi', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     }
     .cover-top-right .label { color: #333; font-weight: 600; }
-    /* Subtítulo abaixo do "Relatório" no mockup */
-    .cover-title-sub {
+    /* Bloco de título + descrição abaixo do "Relatório" no mockup.
+       Posiciona o conjunto uma única vez; os filhos fluem normalmente,
+       então a descrição sempre fica abaixo do subtítulo, independente de
+       quantas linhas o subtítulo ocupe (evita sobreposição). */
+    .cover-headblock {
         position: absolute; left: 26mm; top: 126mm; width: 120mm;
-        color: #111; font-size: 16pt; font-weight: 700; line-height: 1.2; text-align: left; margin: 0;
+        text-align: left;
         font-family: 'Satoshi', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     }
+    .cover-title-sub {
+        color: #111; font-size: 16pt; font-weight: 700; line-height: 1.2; margin: 0;
+        overflow-wrap: break-word; word-break: break-word;
+    }
     .cover-desc {
-        position: absolute; left: 26mm; top: 134mm; width: 120mm;
-        color: #555; font-size: 10.5pt; line-height: 1.35; text-align: left; margin: 0;
-        font-family: 'Satoshi', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        color: #555; font-size: 10.5pt; line-height: 1.35; margin: 3mm 0 0 0;
+        overflow-wrap: break-word; word-break: break-word;
     }
     /* Blocos na faixa verde inferior */
     .cover-prep { position: absolute; left: 14mm; bottom: 39mm; width: 120mm; color: #111; text-align: left; font-family: 'Satoshi', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
@@ -430,8 +437,10 @@ def md_to_pdf(md_file_path, pdf_file_path=None, css_style=None, logo_path=None, 
                 {rep_label_html}
                 <div>{rep_nome}</div>
             </div>
-            <div class=\"cover-title-sub\">{subtitulo}</div>
-            <div class=\"cover-desc\">{descricao}</div>
+            <div class=\"cover-headblock\">
+                <div class=\"cover-title-sub\">{subtitulo}</div>
+                <div class=\"cover-desc\">{descricao}</div>
+            </div>
             <div class=\"cover-prep\">
                 <span class=\"name\">{prep_nome}</span>
                 <div class=\"contact\">{prep_email}</div>
