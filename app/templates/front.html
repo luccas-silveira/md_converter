@@ -218,7 +218,7 @@
         .pv-contact { font-size: 1.76cqw; color: #333; margin-top: .6cqw; }
         .pv-date { position: absolute; right: 34.3%; bottom: 16.5%; width: 19%; font-size: 1.85cqw; color: #141414; }
         .preview-cap { text-align: center; font-size: 11px; color: var(--text-tertiary); margin-top: 14px; letter-spacing: .04em; }
-        #pdf-preview { display: block; width: 100%; aspect-ratio: 210 / 297; border: 0; border-radius: 8px; background: var(--neutral-50); }
+        #pdf-preview { display: block; width: 100%; height: calc(100vh - 150px); min-height: 540px; border: 0; border-radius: 8px; background: var(--neutral-50); }
         #pdf-preview.hidden { display: none; }
         .live-dot {
             display: inline-block; width: 6px; height: 6px; border-radius: 50%;
@@ -842,7 +842,8 @@ Seu conteúdo em Markdown aqui...
                             const pdfPreview = document.getElementById('pdf-preview');
                             const coverPreview = document.getElementById('cover-preview');
                             const previewLabel = document.getElementById('preview-label');
-                            if (pdfPreview) { pdfPreview.src = downloadUrl; pdfPreview.classList.remove('hidden'); }
+                            // #toolbar=0&navpanes=0 esconde o chrome do visualizador; view=FitH ajusta à largura.
+                            if (pdfPreview) { pdfPreview.src = downloadUrl + '#toolbar=0&navpanes=0&view=FitH'; pdfPreview.classList.remove('hidden'); }
                             if (coverPreview) coverPreview.classList.add('hidden');
                             if (previewLabel) previewLabel.textContent = '2 · PDF gerado';
                             successButtons.classList.remove('hidden');
