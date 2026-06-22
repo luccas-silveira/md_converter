@@ -808,13 +808,20 @@ Seu conteúdo em Markdown aqui...
                             if (downloadUrl) { URL.revokeObjectURL(downloadUrl); }
                             downloadUrl = URL.createObjectURL(blob);
                             downloadBtn.href = downloadUrl;
-                            let fileName = 'documento';
-                            if (currentInputMode === 'file' && selectedFile) {
+                            // Nome do arquivo de saída = subtítulo da capa, quando preenchido.
+                            const subtitulo = getVal('cover_subtitulo', '').trim();
+                            let fileName;
+                            if (subtitulo) {
+                                fileName = subtitulo;
+                            } else if (currentInputMode === 'file' && selectedFile) {
                                 fileName = selectedFile.name.replace(/\.[^/.]+$/, '') || 'documento';
                             } else if (currentInputMode === 'meeting') {
-                                const title = meetingTitle.value.trim();
-                                fileName = title ? title.replace(/[^a-z0-9]/gi, '_') : 'resumo_reuniao';
+                                fileName = meetingTitle.value.trim() || 'resumo_reuniao';
+                            } else {
+                                fileName = 'documento';
                             }
+                            // Sanitiza p/ nome de arquivo válido (preserva acentos e espaços).
+                            fileName = fileName.replace(/[\/\\:*?"<>|]/g, '').replace(/\s+/g, ' ').trim().slice(0, 120) || 'documento';
                             const outName = fileName + '.pdf';
                             downloadBtn.setAttribute('download', outName);
                             // Auto download
