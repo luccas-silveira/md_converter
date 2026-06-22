@@ -363,21 +363,51 @@ Seu conteúdo em Markdown aqui...
                         <label class="form-label">Descrição</label>
                         <textarea id="cover_descricao" rows="3" class="form-input" style="resize: vertical;" placeholder="Breve descrição do documento..."></textarea>
                     </div>
-                    <div>
-                        <label class="form-label">Preparado por (nome)</label>
-                        <input id="cover_prep_nome" type="text" class="form-input" placeholder="Seu nome">
+                    <div class="span-2">
+                        <label class="form-label">Preparado por</label>
+                        <div style="display: flex; gap: var(--space-2);">
+                            <select id="profile-select" class="form-input" style="flex: 1;">
+                                <option value="">— selecione um contato —</option>
+                            </select>
+                            <button id="manage-profiles-btn" type="button" class="btn btn-outline" style="padding: var(--space-1) var(--space-3); white-space: nowrap;">Gerenciar</button>
+                        </div>
+                        <!-- valores enviados na conversão; preenchidos pelo dropdown -->
+                        <input type="hidden" id="cover_prep_nome">
+                        <input type="hidden" id="cover_prep_email">
+                        <input type="hidden" id="cover_prep_phone">
                     </div>
-                    <div>
-                        <label class="form-label">Email</label>
-                        <input id="cover_prep_email" type="email" class="form-input" placeholder="email@exemplo.com">
-                    </div>
-                    <div>
-                        <label class="form-label">Telefone</label>
-                        <input id="cover_prep_phone" type="text" class="form-input" placeholder="+55 (47) 99999-9999">
-                    </div>
-                    <div>
+                    <div class="span-2">
                         <label class="form-label">Data</label>
                         <input id="cover_data" type="date" class="form-input">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal: gerenciar contatos salvos -->
+            <div id="profiles-modal" class="hidden" style="position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; z-index: 50; padding: var(--space-4);">
+                <div class="card" style="max-width: 30rem; width: 100%; padding: var(--space-6); max-height: 85vh; overflow: auto;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-4);">
+                        <span style="font-family: var(--font-display); font-size: 1.125rem; font-weight: 600; color: var(--text-primary);">Contatos salvos</span>
+                        <button id="close-profiles-btn" type="button" style="background: none; border: none; cursor: pointer; color: var(--text-tertiary); font-size: 1.25rem; line-height: 1;">✕</button>
+                    </div>
+                    <ul id="profiles-list" style="list-style: none; padding: 0; margin: 0 0 var(--space-4) 0;"></ul>
+                    <div style="border-top: 1px solid var(--border-default); padding-top: var(--space-4);">
+                        <div class="form-grid">
+                            <div class="span-2">
+                                <label class="form-label">Nome</label>
+                                <input id="np-nome" class="form-input" placeholder="Nome do contato">
+                            </div>
+                            <div class="span-2">
+                                <label class="form-label">Email</label>
+                                <input id="np-email" type="email" class="form-input" placeholder="email@exemplo.com">
+                            </div>
+                            <div class="span-2">
+                                <label class="form-label">Telefone</label>
+                                <input id="np-phone" class="form-input" placeholder="+55 (47) 99999-9999">
+                            </div>
+                        </div>
+                        <p id="np-status" class="hidden" style="font-size: 0.8125rem; margin: var(--space-2) 0 0 0;"></p>
+                        <button id="add-profile-btn" type="button" class="btn btn-primary btn-block" style="margin-top: var(--space-3);">Adicionar contato</button>
                     </div>
                 </div>
             </div>
@@ -811,8 +841,132 @@ Seu conteúdo em Markdown aqui...
             // New file
             newFileBtn.addEventListener('click', (e) => { e.preventDefault(); resetAll(); });
 
+            // ── Contatos salvos (perfis "preparado por") ──
+            const profileSelect = document.getElementById('profile-select');
+            const manageBtn = document.getElementById('manage-profiles-btn');
+            const profilesModal = document.getElementById('profiles-modal');
+            const closeProfilesBtn = document.getElementById('close-profiles-btn');
+            const profilesList = document.getElementById('profiles-list');
+            const addProfileBtn = document.getElementById('add-profile-btn');
+            const npNome = document.getElementById('np-nome');
+            const npEmail = document.getElementById('np-email');
+            const npPhone = document.getElementById('np-phone');
+            const npStatus = document.getElementById('np-status');
+            let profilesCache = [];
+
+            function applyProfileToHidden(p) {
+                document.getElementById('cover_prep_nome').value = p ? (p.nome || '') : '';
+                document.getElementById('cover_prep_email').value = p ? (p.email || '') : '';
+                document.getElementById('cover_prep_phone').value = p ? (p.telefone || '') : '';
+            }
+
+            function populateProfileSelect() {
+                const prev = profileSelect.value;
+                profileSelect.innerHTML = '<option value="">— selecione um contato —</option>';
+                profilesCache.forEach(p => {
+                    const opt = document.createElement('option');
+                    opt.value = p.id;
+                    opt.textContent = p.email ? `${p.nome} — ${p.email}` : p.nome;
+                    profileSelect.appendChild(opt);
+                });
+                // mantém seleção se ainda existir
+                if (profilesCache.some(p => p.id === prev)) profileSelect.value = prev;
+                else applyProfileToHidden(null);
+            }
+
+            function renderProfilesList() {
+                profilesList.innerHTML = '';
+                if (!profilesCache.length) {
+                    profilesList.innerHTML = '<li style="color: var(--text-tertiary); font-size: 0.875rem;">Nenhum contato salvo ainda.</li>';
+                    return;
+                }
+                profilesCache.forEach(p => {
+                    const li = document.createElement('li');
+                    li.style.cssText = 'display:flex; align-items:center; justify-content:space-between; gap:var(--space-3); padding:var(--space-2) 0; border-bottom:1px solid var(--border-default);';
+                    const info = document.createElement('div');
+                    info.style.cssText = 'font-size:0.875rem; color:var(--text-primary); overflow:hidden;';
+                    // textContent (não innerHTML): nome/email/telefone são dados do usuário; evita XSS armazenado.
+                    const nameDiv = document.createElement('div');
+                    nameDiv.style.fontWeight = '600';
+                    nameDiv.textContent = p.nome || '';
+                    const metaDiv = document.createElement('div');
+                    metaDiv.style.color = 'var(--text-tertiary)';
+                    metaDiv.textContent = [p.email, p.telefone].filter(Boolean).join(' · ');
+                    info.appendChild(nameDiv);
+                    info.appendChild(metaDiv);
+                    const del = document.createElement('button');
+                    del.type = 'button';
+                    del.textContent = 'Remover';
+                    del.className = 'btn btn-outline';
+                    del.style.cssText = 'padding:var(--space-1) var(--space-2); font-size:0.75rem; white-space:nowrap;';
+                    del.addEventListener('click', () => deleteProfile(p.id));
+                    li.appendChild(info);
+                    li.appendChild(del);
+                    profilesList.appendChild(li);
+                });
+            }
+
+            function setNpStatus(msg, ok) {
+                if (!msg) { npStatus.classList.add('hidden'); return; }
+                npStatus.textContent = msg;
+                npStatus.classList.remove('hidden');
+                npStatus.style.color = ok ? 'var(--text-tertiary)' : 'var(--danger, #c0392b)';
+            }
+
+            async function loadProfiles() {
+                try {
+                    const resp = await fetch('/relatorio/profiles');
+                    profilesCache = resp.ok ? await resp.json() : [];
+                } catch (e) { profilesCache = []; }
+                populateProfileSelect();
+                renderProfilesList();
+            }
+
+            async function addProfile() {
+                const nome = npNome.value.trim();
+                if (!nome) { setNpStatus('Nome é obrigatório.', false); return; }
+                addProfileBtn.disabled = true;
+                try {
+                    const resp = await fetch('/relatorio/profiles', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ nome, email: npEmail.value.trim(), telefone: npPhone.value.trim() })
+                    });
+                    const data = await resp.json();
+                    if (!resp.ok) { setNpStatus(data.error || 'Falha ao adicionar.', false); return; }
+                    npNome.value = ''; npEmail.value = ''; npPhone.value = '';
+                    setNpStatus('Contato adicionado.', true);
+                    await loadProfiles();
+                    profileSelect.value = data.id;
+                    profileSelect.dispatchEvent(new Event('change'));
+                } catch (e) {
+                    setNpStatus('Falha de rede.', false);
+                } finally {
+                    addProfileBtn.disabled = false;
+                }
+            }
+
+            async function deleteProfile(id) {
+                try {
+                    const resp = await fetch(`/relatorio/profiles/${id}`, { method: 'DELETE' });
+                    if (resp.ok) await loadProfiles();
+                } catch (e) { /* silencioso */ }
+            }
+
+            if (profileSelect) {
+                profileSelect.addEventListener('change', () => {
+                    const p = profilesCache.find(x => x.id === profileSelect.value);
+                    applyProfileToHidden(p || null);
+                });
+            }
+            if (manageBtn) manageBtn.addEventListener('click', () => { setNpStatus(''); renderProfilesList(); profilesModal.classList.remove('hidden'); });
+            if (closeProfilesBtn) closeProfilesBtn.addEventListener('click', () => profilesModal.classList.add('hidden'));
+            if (profilesModal) profilesModal.addEventListener('click', (e) => { if (e.target === profilesModal) profilesModal.classList.add('hidden'); });
+            if (addProfileBtn) addProfileBtn.addEventListener('click', addProfile);
+
             // Initialize
             resetAll();
+            loadProfiles();
         })();
     </script>
 </body>
