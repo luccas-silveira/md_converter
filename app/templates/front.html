@@ -218,6 +218,8 @@
         .pv-contact { font-size: 1.76cqw; color: #333; margin-top: .6cqw; }
         .pv-date { position: absolute; right: 34.3%; bottom: 16.5%; width: 19%; font-size: 1.85cqw; color: #141414; }
         .preview-cap { text-align: center; font-size: 11px; color: var(--text-tertiary); margin-top: 14px; letter-spacing: .04em; }
+        #pdf-preview { display: block; width: 100%; aspect-ratio: 210 / 297; border: 0; border-radius: 8px; background: var(--neutral-50); }
+        #pdf-preview.hidden { display: none; }
         .live-dot {
             display: inline-block; width: 6px; height: 6px; border-radius: 50%;
             background: var(--green-500); margin-right: 6px; vertical-align: middle;
@@ -506,21 +508,26 @@ Seu conteúdo em Markdown aqui...
 
         <!-- Coluna direita: pré-visualização ao vivo da capa (1:1 com o PDF) -->
         <div class="preview-col">
-            <div class="panel-label">2 · Pré-visualização da capa</div>
+            <div class="panel-label" id="preview-label">2 · Pré-visualização da capa</div>
             <div class="preview-frame">
-                <div class="a4">
-                    <div class="pv-head">
-                        <div class="pv-sub" id="pv-sub"></div>
-                        <div class="pv-desc" id="pv-desc"></div>
+                <!-- Estado 1: prévia ao vivo da capa (antes de gerar) -->
+                <div id="cover-preview">
+                    <div class="a4">
+                        <div class="pv-head">
+                            <div class="pv-sub" id="pv-sub"></div>
+                            <div class="pv-desc" id="pv-desc"></div>
+                        </div>
+                        <div class="pv-prep">
+                            <div class="pv-nome" id="pv-nome"></div>
+                            <div class="pv-contact" id="pv-email"></div>
+                            <div class="pv-contact" id="pv-phone"></div>
+                        </div>
+                        <div class="pv-date" id="pv-data"></div>
                     </div>
-                    <div class="pv-prep">
-                        <div class="pv-nome" id="pv-nome"></div>
-                        <div class="pv-contact" id="pv-email"></div>
-                        <div class="pv-contact" id="pv-phone"></div>
-                    </div>
-                    <div class="pv-date" id="pv-data"></div>
+                    <div class="preview-cap"><span class="live-dot"></span>atualiza enquanto você edita</div>
                 </div>
-                <div class="preview-cap"><span class="live-dot"></span>atualiza enquanto você edita</div>
+                <!-- Estado 2: PDF gerado renderizado inline (após gerar) -->
+                <iframe id="pdf-preview" class="hidden" title="PDF gerado"></iframe>
             </div>
         </div>
     </main>
@@ -633,6 +640,13 @@ Seu conteúdo em Markdown aqui...
                 successButtons.classList.add('hidden');
                 convertBtn.classList.remove('hidden');
                 setConvertEnabled(false);
+                // Restaura a coluna direita para a prévia da capa.
+                const pdfPreview = document.getElementById('pdf-preview');
+                const coverPreview = document.getElementById('cover-preview');
+                const previewLabel = document.getElementById('preview-label');
+                if (pdfPreview) { pdfPreview.classList.add('hidden'); pdfPreview.removeAttribute('src'); }
+                if (coverPreview) coverPreview.classList.remove('hidden');
+                if (previewLabel) previewLabel.textContent = '2 · Pré-visualização da capa';
                 if (typeof updatePreview === 'function') updatePreview();
             }
 
@@ -824,13 +838,13 @@ Seu conteúdo em Markdown aqui...
                             fileName = fileName.replace(/[\/\\:*?"<>|]/g, '').replace(/\s+/g, ' ').trim().slice(0, 120) || 'documento';
                             const outName = fileName + '.pdf';
                             downloadBtn.setAttribute('download', outName);
-                            // Auto download
-                            const tempLink = document.createElement('a');
-                            tempLink.href = downloadUrl;
-                            tempLink.download = outName;
-                            document.body.appendChild(tempLink);
-                            tempLink.click();
-                            tempLink.remove();
+                            // Mostra o PDF renderizado inline na coluna direita (sem download automático).
+                            const pdfPreview = document.getElementById('pdf-preview');
+                            const coverPreview = document.getElementById('cover-preview');
+                            const previewLabel = document.getElementById('preview-label');
+                            if (pdfPreview) { pdfPreview.src = downloadUrl; pdfPreview.classList.remove('hidden'); }
+                            if (coverPreview) coverPreview.classList.add('hidden');
+                            if (previewLabel) previewLabel.textContent = '2 · PDF gerado';
                             successButtons.classList.remove('hidden');
                             convertBtn.classList.add('hidden');
                             progressSection.classList.add('hidden');
