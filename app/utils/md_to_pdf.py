@@ -245,8 +245,11 @@ def md_to_pdf(md_file_path, pdf_file_path=None, css_style=None, logo_path=None, 
         overflow-x: auto;
         line-height: 1.5;
         font-size: 0.85em;
-        page-break-inside: avoid;
-        page-break-after: avoid;
+        /* Blocos longos (ex.: fluxograma ASCII) quebram entre páginas em vez de
+           pular o bloco inteiro e deixar um vão em branco após o título. */
+        page-break-inside: auto;
+        orphans: 4;
+        widows: 4;
     }
 
     pre code {
