@@ -347,7 +347,13 @@ Seu conteúdo em Markdown aqui...
 
             <!-- Cover Form -->
             <div id="cover-form" class="hidden" style="margin-bottom: var(--space-8);">
-                <label class="form-label" style="margin-bottom: var(--space-3); font-weight: 600; color: var(--text-primary);">Informações da capa</label>
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-3);">
+                    <label class="form-label" style="font-weight: 600; color: var(--text-primary); margin: 0;">Informações da capa</label>
+                    <button id="gen-cover-btn" type="button" class="btn btn-primary" style="padding: var(--space-1) var(--space-3); font-size: 0.8125rem;" disabled>
+                        ✨ Gerar com IA
+                    </button>
+                </div>
+                <p id="gen-cover-status" class="hidden" style="font-size: 0.8125rem; margin-bottom: var(--space-3);"></p>
                 <div class="form-grid">
                     <div class="span-2">
                         <label class="form-label">Subtítulo (abaixo de 'Relatório')</label>
@@ -490,6 +496,13 @@ Seu conteúdo em Markdown aqui...
                                  (currentInputMode === 'text' && markdownText.value.trim()) ||
                                  (currentInputMode === 'meeting' && selectedMeetingFile);
                 setConvertEnabled(hasContent);
+                // Botão de IA só faz sentido com um documento de texto (modos file/text).
+                const genBtn = document.getElementById('gen-cover-btn');
+                if (genBtn) {
+                    const canGenerate = (currentInputMode === 'file' && selectedFile) ||
+                                        (currentInputMode === 'text' && markdownText.value.trim());
+                    genBtn.disabled = !canGenerate;
+                }
             }
 
             function resetAll() {
@@ -739,6 +752,61 @@ Seu conteúdo em Markdown aqui...
 
                 xhr.send(form);
             });
+
+            // Gerar capa com IA (opt-in): lê o documento da aba ativa e preenche
+            // subtítulo/descrição para o usuário revisar antes de converter.
+            const genCoverBtn = document.getElementById('gen-cover-btn');
+            const genCoverStatus = document.getElementById('gen-cover-status');
+
+            function setGenStatus(msg, ok) {
+                if (!genCoverStatus) return;
+                if (!msg) { genCoverStatus.classList.add('hidden'); return; }
+                genCoverStatus.textContent = msg;
+                genCoverStatus.classList.remove('hidden');
+                genCoverStatus.style.color = ok ? 'var(--text-tertiary)' : 'var(--danger, #c0392b)';
+            }
+
+            function getDocumentText() {
+                if (currentInputMode === 'text') {
+                    return Promise.resolve(markdownText.value.trim());
+                }
+                if (currentInputMode === 'file' && selectedFile) {
+                    return selectedFile.text();
+                }
+                return Promise.resolve('');
+            }
+
+            if (genCoverBtn) {
+                genCoverBtn.addEventListener('click', async () => {
+                    if (genCoverBtn.disabled) return;
+                    const original = genCoverBtn.textContent;
+                    genCoverBtn.disabled = true;
+                    genCoverBtn.textContent = 'Gerando...';
+                    setGenStatus('Analisando o documento...', true);
+                    try {
+                        const docText = await getDocumentText();
+                        if (!docText) { setGenStatus('Documento vazio.', false); return; }
+                        const form = new FormData();
+                        form.append('document', docText);
+                        const resp = await fetch('/relatorio/suggest-cover', { method: 'POST', body: form });
+                        const data = await resp.json();
+                        if (!resp.ok) {
+                            setGenStatus(data.error || 'Não foi possível gerar.', false);
+                            return;
+                        }
+                        const sub = document.getElementById('cover_subtitulo');
+                        const desc = document.getElementById('cover_descricao');
+                        if (sub && data.subtitulo) sub.value = data.subtitulo;
+                        if (desc && data.descricao) desc.value = data.descricao;
+                        setGenStatus('Pronto — revise os textos abaixo.', true);
+                    } catch (e) {
+                        setGenStatus('Falha de rede ao gerar.', false);
+                    } finally {
+                        genCoverBtn.textContent = original;
+                        genCoverBtn.disabled = false;
+                    }
+                });
+            }
 
             // New file
             newFileBtn.addEventListener('click', (e) => { e.preventDefault(); resetAll(); });
