@@ -150,22 +150,93 @@
             .form-grid .span-2 { grid-column: span 2; }
         }
     </style>
+    <style>
+        /* ── Workbench layout (UI upgrade) ── */
+        body {
+            background: radial-gradient(120% 80% at 100% 0%, #f3fff0 0%, var(--bg-page) 42%);
+            min-height: 100vh;
+        }
+        .topbar {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 16px 32px; border-bottom: 1px solid var(--border-default);
+            background: rgba(255,255,255,0.72); backdrop-filter: blur(8px);
+            position: sticky; top: 0; z-index: var(--z-sticky);
+        }
+        .brand { display: flex; align-items: center; gap: 12px; }
+        .brand-mark {
+            width: 34px; height: 34px; border-radius: 9px; background: var(--neutral-900);
+            display: flex; align-items: center; justify-content: center;
+            color: var(--green-400); font-family: var(--font-display); font-weight: 700; font-size: 17px;
+        }
+        .brand-name { font-family: var(--font-display); font-weight: 600; font-size: 18px; color: var(--neutral-900); }
+        .brand-name span { color: var(--green-500); }
+        .topbar .tab-bar { background: var(--neutral-100); }
+
+        .wb {
+            max-width: 1180px; margin: 0 auto; padding: 36px 32px 64px;
+            display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1.05fr);
+            gap: 36px; align-items: start;
+        }
+        @media (max-width: 900px) { .wb { grid-template-columns: 1fr; } .preview-col { display: none; } }
+        .panel-label {
+            font-size: 11px; letter-spacing: .14em; text-transform: uppercase;
+            color: var(--text-tertiary); font-weight: 600; margin-bottom: 14px;
+        }
+        .wb-card {
+            background: var(--neutral-0); border: 1px solid var(--border-default);
+            border-radius: var(--radius-lg); padding: var(--space-6);
+            box-shadow: 0 1px 2px rgba(20,20,20,.04), 0 1px 3px rgba(20,20,20,.06);
+        }
+
+        /* Preview ao vivo (capa A4 fiel ao PDF) */
+        .preview-col { position: sticky; top: 96px; }
+        .preview-frame {
+            background: var(--neutral-0); border: 1px solid var(--border-default);
+            border-radius: var(--radius-lg); padding: 20px;
+            box-shadow: 0 24px 60px rgba(20,20,20,.10), 0 8px 24px rgba(20,20,20,.06);
+        }
+        .a4 {
+            container-type: inline-size;
+            aspect-ratio: 210 / 297; width: 100%; position: relative; overflow: hidden;
+            border-radius: 8px; border: 1px solid var(--neutral-100);
+            background: #fff url('{{ url_for('static', filename='img/cover-mockup.jpg') }}') center / cover no-repeat;
+            box-shadow: 0 2px 10px rgba(20,20,20,.05);
+        }
+        /* Overlays posicionados em % equivalentes aos mm do md_to_pdf → WYSIWYG */
+        .pv-head { position: absolute; left: 12.4%; top: 42.4%; width: 57.1%; }
+        .pv-sub {
+            font-family: var(--font-display); font-weight: 600; font-size: 2.69cqw;
+            color: #141414; line-height: 1.2; margin: 0; overflow-wrap: break-word;
+        }
+        .pv-desc {
+            font-size: 1.76cqw; color: #5c5c5c; line-height: 1.35; margin: 1.4cqw 0 0 0;
+            overflow-wrap: break-word;
+        }
+        .pv-prep { position: absolute; left: 6.67%; bottom: 13.1%; width: 57%; }
+        .pv-nome { font-family: var(--font-display); font-weight: 700; font-size: 2.18cqw; color: #141414; }
+        .pv-contact { font-size: 1.76cqw; color: #333; margin-top: .6cqw; }
+        .pv-date { position: absolute; right: 34.3%; bottom: 16.5%; width: 19%; font-size: 1.85cqw; color: #141414; }
+        .preview-cap { text-align: center; font-size: 11px; color: var(--text-tertiary); margin-top: 14px; letter-spacing: .04em; }
+        .live-dot {
+            display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+            background: var(--green-500); margin-right: 6px; vertical-align: middle;
+            box-shadow: 0 0 0 3px rgba(144,204,103,.25);
+        }
+    </style>
 </head>
 <body>
-    <!-- Header -->
-    <header class="app-header">
-        <div class="container" style="padding-top: var(--space-4); padding-bottom: var(--space-4);">
-            <div class="flex items-center gap-3">
-                <div class="icon-circle-sm" style="background: var(--green-400);">
-                    <svg class="w-5 h-5" style="color: var(--neutral-900);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                    </svg>
-                </div>
-                <span style="font-family: var(--font-display); font-size: 1.25rem; font-weight: 600; color: var(--text-primary);">
-                    Relatório <span style="color: var(--green-500);">ZOI</span>
-                </span>
-            </div>
+    <!-- Top bar -->
+    <header class="topbar">
+        <div class="brand">
+            <div class="brand-mark">Z</div>
+            <div class="brand-name">Relatório <span>ZOI</span></div>
         </div>
+        <div class="tab-bar">
+            <button id="tab-file" class="tab-btn active">Enviar arquivo</button>
+            <button id="tab-text" class="tab-btn">Colar texto</button>
+            <button id="tab-meeting" class="tab-btn">Resumo de reunião</button>
+        </div>
+        <div style="width: 140px;"></div>
     </header>
 
     <script>
@@ -173,28 +244,12 @@
         window.APP_MAX_SIZE_BYTES = (window.APP_MAX_SIZE_MB || 100) * 1024 * 1024;
     </script>
 
-    <!-- Main Content -->
-    <main class="container" style="max-width: 42rem; padding-top: var(--space-12); padding-bottom: var(--space-20);">
-        <!-- Hero -->
-        <div class="text-center" style="margin-bottom: var(--space-10);">
-            <h1 class="text-display-md" style="font-family: var(--font-display); color: var(--text-primary); margin-bottom: var(--space-3);">
-                Gere seu PDF
-            </h1>
-            <p class="text-body-lg" style="color: var(--text-secondary); max-width: 32rem; margin: 0 auto;">
-                Transforme qualquer arquivo .md em um documento padrão ZOI
-            </p>
-        </div>
-
-        <!-- Converter Card -->
-        <div class="card" style="padding: var(--space-8);">
-            <!-- Tabs -->
-            <div style="margin-bottom: var(--space-6);">
-                <div class="tab-bar">
-                    <button id="tab-file" class="tab-btn active">Enviar arquivo</button>
-                    <button id="tab-text" class="tab-btn">Colar texto</button>
-                    <button id="tab-meeting" class="tab-btn">Resumo de reunião</button>
-                </div>
-            </div>
+    <!-- Main Content: workbench (2 colunas) -->
+    <main class="wb">
+        <!-- Coluna esquerda: documento + capa -->
+        <div>
+            <div class="panel-label">1 · Documento</div>
+            <div class="wb-card">
 
             <!-- File Upload Area -->
             <div id="upload-section" style="margin-bottom: var(--space-8);">
@@ -424,7 +479,7 @@ Seu conteúdo em Markdown aqui...
             </div>
 
             <!-- Action Buttons -->
-            <div>
+            <div style="margin-top: var(--space-6);">
                 <!-- Convert Button -->
                 <button id="convert-btn" class="btn btn-block" disabled
                     style="background: var(--neutral-200); color: var(--text-tertiary); cursor: not-allowed; padding: var(--space-3) var(--space-6);">
@@ -443,6 +498,28 @@ Seu conteúdo em Markdown aqui...
                         Novo arquivo
                     </button>
                 </div>
+            </div>
+
+            </div><!-- /wb-card -->
+        </div><!-- /coluna esquerda -->
+
+        <!-- Coluna direita: pré-visualização ao vivo da capa (1:1 com o PDF) -->
+        <div class="preview-col">
+            <div class="panel-label">2 · Pré-visualização da capa</div>
+            <div class="preview-frame">
+                <div class="a4">
+                    <div class="pv-head">
+                        <div class="pv-sub" id="pv-sub"></div>
+                        <div class="pv-desc" id="pv-desc"></div>
+                    </div>
+                    <div class="pv-prep">
+                        <div class="pv-nome" id="pv-nome"></div>
+                        <div class="pv-contact" id="pv-email"></div>
+                        <div class="pv-contact" id="pv-phone"></div>
+                    </div>
+                    <div class="pv-date" id="pv-data"></div>
+                </div>
+                <div class="preview-cap"><span class="live-dot"></span>atualiza enquanto você edita</div>
             </div>
         </div>
     </main>
@@ -555,6 +632,7 @@ Seu conteúdo em Markdown aqui...
                 successButtons.classList.add('hidden');
                 convertBtn.classList.remove('hidden');
                 setConvertEnabled(false);
+                if (typeof updatePreview === 'function') updatePreview();
             }
 
             function setActiveTab(activeTab) {
@@ -828,6 +906,7 @@ Seu conteúdo em Markdown aqui...
                         const desc = document.getElementById('cover_descricao');
                         if (sub && data.subtitulo) sub.value = data.subtitulo;
                         if (desc && data.descricao) desc.value = data.descricao;
+                        if (typeof updatePreview === 'function') updatePreview();
                         setGenStatus('Pronto — revise os textos abaixo.', true);
                     } catch (e) {
                         setGenStatus('Falha de rede ao gerar.', false);
@@ -858,6 +937,7 @@ Seu conteúdo em Markdown aqui...
                 document.getElementById('cover_prep_nome').value = p ? (p.nome || '') : '';
                 document.getElementById('cover_prep_email').value = p ? (p.email || '') : '';
                 document.getElementById('cover_prep_phone').value = p ? (p.telefone || '') : '';
+                if (typeof updatePreview === 'function') updatePreview();
             }
 
             function populateProfileSelect() {
@@ -968,9 +1048,33 @@ Seu conteúdo em Markdown aqui...
             document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && profilesModal.style.display === 'flex') closeProfilesModal(); });
             if (addProfileBtn) addProfileBtn.addEventListener('click', addProfile);
 
+            // ── Pré-visualização ao vivo da capa (espelha posições do md_to_pdf) ──
+            function fmtPreviewDate(v) {
+                if (!v) return '';
+                const p = v.split('-');
+                return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : v;
+            }
+            function setPreviewText(id, val) {
+                const el = document.getElementById(id);
+                if (el) el.textContent = val || '';
+            }
+            function updatePreview() {
+                setPreviewText('pv-sub', getVal('cover_subtitulo'));
+                setPreviewText('pv-desc', getVal('cover_descricao'));
+                setPreviewText('pv-nome', getVal('cover_prep_nome'));
+                setPreviewText('pv-email', getVal('cover_prep_email'));
+                setPreviewText('pv-phone', getVal('cover_prep_phone'));
+                setPreviewText('pv-data', fmtPreviewDate(getVal('cover_data')));
+            }
+            ['cover_subtitulo','cover_descricao','cover_data'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.addEventListener('input', updatePreview);
+            });
+
             // Initialize
             resetAll();
             loadProfiles();
+            updatePreview();
         })();
     </script>
 </body>
