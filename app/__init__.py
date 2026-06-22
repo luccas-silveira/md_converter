@@ -34,10 +34,12 @@ def create_app():
     from app.routes.main import main_bp
     from app.routes.conversion import conversion_bp
     from app.routes.progress import progress_bp
+    from app.routes.cover_ai import cover_ai_bp
 
     app.register_blueprint(main_bp, url_prefix='/relatorio')
     app.register_blueprint(conversion_bp, url_prefix='/relatorio')
     app.register_blueprint(progress_bp, url_prefix='/relatorio')
+    app.register_blueprint(cover_ai_bp, url_prefix='/relatorio')
 
     # O módulo de reunião depende de Whisper/OpenAI e pode falhar sem derrubar o app.
     try:
