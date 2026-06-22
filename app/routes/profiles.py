@@ -66,6 +66,9 @@ def add_profile():
     profile = {"id": uuid.uuid4().hex[:8], "nome": nome, "email": email, "telefone": telefone}
     with _lock:
         profiles = _load()
+        # Cap de contagem: impede crescimento ilimitado do JSON compartilhado.
+        if len(profiles) >= 500:
+            return jsonify({"error": "Limite de contatos atingido (500)."}), 400
         profiles.append(profile)
         _save(profiles)
     return jsonify(profile), 201

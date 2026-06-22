@@ -384,7 +384,7 @@ Seu conteúdo em Markdown aqui...
             </div>
 
             <!-- Modal: gerenciar contatos salvos -->
-            <div id="profiles-modal" class="hidden" style="position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; z-index: 50; padding: var(--space-4);">
+            <div id="profiles-modal" style="position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: none; align-items: center; justify-content: center; z-index: 50; padding: var(--space-4);">
                 <div class="card" style="max-width: 30rem; width: 100%; padding: var(--space-6); max-height: 85vh; overflow: auto;">
                     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-4);">
                         <span style="font-family: var(--font-display); font-size: 1.125rem; font-weight: 600; color: var(--text-primary);">Contatos salvos</span>
@@ -959,9 +959,13 @@ Seu conteúdo em Markdown aqui...
                     applyProfileToHidden(p || null);
                 });
             }
-            if (manageBtn) manageBtn.addEventListener('click', () => { setNpStatus(''); renderProfilesList(); profilesModal.classList.remove('hidden'); });
-            if (closeProfilesBtn) closeProfilesBtn.addEventListener('click', () => profilesModal.classList.add('hidden'));
-            if (profilesModal) profilesModal.addEventListener('click', (e) => { if (e.target === profilesModal) profilesModal.classList.add('hidden'); });
+            function openProfilesModal() { setNpStatus(''); renderProfilesList(); profilesModal.style.display = 'flex'; }
+            function closeProfilesModal() { profilesModal.style.display = 'none'; }
+            if (manageBtn) manageBtn.addEventListener('click', openProfilesModal);
+            if (closeProfilesBtn) closeProfilesBtn.addEventListener('click', closeProfilesModal);
+            if (profilesModal) profilesModal.addEventListener('click', (e) => { if (e.target === profilesModal) closeProfilesModal(); });
+            // ESC fecha o modal
+            document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && profilesModal.style.display === 'flex') closeProfilesModal(); });
             if (addProfileBtn) addProfileBtn.addEventListener('click', addProfile);
 
             // Initialize
