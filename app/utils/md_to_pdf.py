@@ -186,22 +186,22 @@ def md_to_pdf(md_file_path, pdf_file_path=None, css_style=None, logo_path=None, 
     /* faixa verde inferior */
     .cover-band {
         position: absolute; left: 0; right: 0; bottom: 0; height: 76.1mm;
-        background: #b5ff81; display: flex; align-items: center;
+        background: #b5ff81;
     }
-    /* conteúdo centralizado verticalmente na faixa; prep e data em 2 colunas
-       alinhadas pelo topo (mesma linha base do rótulo) */
-    .cover-band-inner {
-        width: 100%; padding: 0 14mm;
-        display: grid; grid-template-columns: 1fr 1fr; column-gap: 8mm; align-items: start;
+    /* prep e data em posição absoluta (compat WeasyPrint 60, sem grid/flex):
+       centralizados na altura da faixa, na mesma linha base */
+    .cover-prep {
+        position: absolute; left: 14mm; top: 248mm; width: 90mm; color: #141414;
     }
-    .cover-prep { color: #141414; }
     .cover-prep .label { font-weight: 700; font-size: 11pt; }
     .cover-prep .name {
         display: block; margin-top: 2mm; font-size: 13pt; font-weight: 700; color: #141414;
         font-family: 'Clash Display', -apple-system, sans-serif;
     }
     .cover-prep .contact { margin-top: 1mm; color: #333333; font-size: 10.5pt; }
-    .cover-date { color: #141414; font-size: 11pt; }
+    .cover-date {
+        position: absolute; left: 105mm; top: 248mm; width: 80mm; color: #141414; font-size: 11pt;
+    }
     .cover-date .label { font-weight: 700; }
 
     body {
@@ -492,17 +492,14 @@ def md_to_pdf(md_file_path, pdf_file_path=None, css_style=None, logo_path=None, 
             <div class="cover-title-sub">{subtitulo}</div>
             <div class="cover-desc">{descricao}</div>
         </div>
-        <div class="cover-band">
-            <div class="cover-band-inner">
-                <div class="cover-prep">
-                    <span class="label">Preparado por:</span>
-                    <span class="name">{prep_nome}</span>
-                    <div class="contact">{prep_email}</div>
-                    <div class="contact">{prep_phone}</div>
-                </div>
-                <div class="cover-date"><span class="label">Data:</span> {data_text}</div>
-            </div>
+        <div class="cover-band"></div>
+        <div class="cover-prep">
+            <span class="label">Preparado por:</span>
+            <span class="name">{prep_nome}</span>
+            <div class="contact">{prep_email}</div>
+            <div class="contact">{prep_phone}</div>
         </div>
+        <div class="cover-date"><span class="label">Data:</span> {data_text}</div>
     </section>
     <div style="page-break-after: always;"></div>
     """
