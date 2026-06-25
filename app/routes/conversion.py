@@ -13,6 +13,7 @@ from werkzeug.utils import secure_filename
 from app.utils.md_to_pdf import md_to_pdf
 from app.routes.progress import update_progress
 from app.utils.file_security import sanitize_filename
+from app.utils.image_check import check_and_placeholder_images
 
 conversion_bp = Blueprint('conversion', __name__)
 logger = logging.getLogger(__name__)
@@ -62,6 +63,7 @@ def convert_md():
             'topo_direito_site': request.form.get('cover_top_site', ''),
             'representante_label': request.form.get('cover_rep_label', ''),
             'representante_nome': request.form.get('cover_rep_nome', ''),
+            'titulo_principal': request.form.get('cover_titulo_principal', ''),
             'subtitulo': request.form.get('cover_subtitulo', ''),
             'descricao': request.form.get('cover_descricao', ''),
             'preparado_nome': request.form.get('cover_prep_nome', ''),
@@ -89,8 +91,22 @@ def convert_md():
                 raise Exception(f"Falha ao salvar arquivo em {md_path}")
 
             with open(md_path, 'r', encoding='utf-8') as f:
-                content_preview = f.read()[:200]
-                logger.info(f"Conteúdo do arquivo (primeiros 200 chars): {content_preview}")
+                md_content = f.read()
+                logger.info(f"Conteúdo do arquivo (primeiros 200 chars): {md_content[:200]}")
+
+            # Checar imagens remotas: URL quebrada vira placeholder no PDF e
+            # aviso via SSE (não bloqueia a geração).
+            update_progress(session_id, 35, "Verificando imagens...")
+            md_content, broken_urls = check_and_placeholder_images(md_content)
+            if broken_urls:
+                for url in broken_urls:
+                    logger.warning(f"Imagem indisponível: {url}")
+                update_progress(
+                    session_id, 40,
+                    f"⚠ {len(broken_urls)} imagem(ns) indisponível(eis) — gerando mesmo assim",
+                )
+                with open(md_path, 'w', encoding='utf-8') as f:
+                    f.write(md_content)
 
             logo_path = None
             if logo_file and logo_file.filename:

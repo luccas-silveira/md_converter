@@ -48,7 +48,10 @@ def suggest_cover():
             max_tokens=500,
         )
         data = json.loads(response.choices[0].message.content)
+        # título: garante no máximo 2 palavras (defesa caso o modelo extrapole).
+        titulo = " ".join((data.get("titulo") or "").strip().split()[:2])
         return jsonify({
+            "titulo": titulo,
             "subtitulo": (data.get("subtitulo") or "").strip(),
             "descricao": (data.get("descricao") or "").strip(),
         }), 200

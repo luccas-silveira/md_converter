@@ -213,10 +213,23 @@
             font-size: 1.76cqw; color: #5c5c5c; line-height: 1.35; margin: 1.4cqw 0 0 0;
             overflow-wrap: break-word;
         }
-        .pv-prep { position: absolute; left: 6.67%; bottom: 13.1%; width: 57%; }
-        .pv-nome { font-family: var(--font-display); font-weight: 700; font-size: 2.18cqw; color: #141414; }
+        /* repinta a faixa verde por cima do JPG (mesma cor #b5ff81) p/ esconder os
+           rótulos chapados e renderizar o bloco centralizado, igual ao PDF */
+        .pv-band-mask { position: absolute; left: 0; right: 0; top: 74.3%; bottom: 0; background: #b5ff81; }
+        .pv-prep { position: absolute; left: 6.67%; top: 83.5%; width: 43%; }
+        .pv-prep-label { font-weight: 700; font-size: 1.85cqw; color: #141414; }
+        .pv-nome { font-family: var(--font-display); font-weight: 700; font-size: 2.18cqw; color: #141414; margin-top: .7cqw; }
         .pv-contact { font-size: 1.76cqw; color: #333; margin-top: .6cqw; }
-        .pv-date { position: absolute; right: 34.3%; bottom: 16.5%; width: 19%; font-size: 1.85cqw; color: #141414; }
+        .pv-date { position: absolute; left: 50%; top: 83.5%; width: 40%; font-size: 1.85cqw; color: #141414; }
+        .pv-date-label { font-weight: 700; }
+        /* título principal editável: mascara a palavra chapada no JPG e renderiza o título atual */
+        .pv-title {
+            position: absolute; left: 12.8%; top: 31.2%; width: 84%; height: 11.6%;
+            background: #fff; display: flex; align-items: center; overflow: hidden;
+            white-space: nowrap;
+            font-family: var(--font-display); font-weight: 800; color: #141414;
+            font-size: 13cqw; line-height: 1; letter-spacing: -0.02em;
+        }
         .preview-cap { text-align: center; font-size: 11px; color: var(--text-tertiary); margin-top: 14px; letter-spacing: .04em; }
         #pdf-preview { display: block; width: 100%; height: calc(100vh - 150px); min-height: 540px; border: 0; border-radius: 8px; background: var(--neutral-50); }
         #pdf-preview.hidden { display: none; }
@@ -414,7 +427,11 @@ Seu conteúdo em Markdown aqui...
                 <p id="gen-cover-status" class="hidden" style="font-size: 0.8125rem; margin-bottom: var(--space-3);"></p>
                 <div class="form-grid">
                     <div class="span-2">
-                        <label class="form-label">Subtítulo (abaixo de 'Relatório')</label>
+                        <label class="form-label">Título principal <span style="color: var(--text-tertiary); font-weight: 400;">(palavra gigante — 1 ou 2 palavras)</span></label>
+                        <input id="cover_titulo_principal" type="text" class="form-input" value="Relatório" maxlength="24" placeholder="Relatório">
+                    </div>
+                    <div class="span-2">
+                        <label class="form-label">Subtítulo (abaixo do título)</label>
                         <input id="cover_subtitulo" type="text" class="form-input" placeholder="Avanço da integração de IA da ZOI">
                     </div>
                     <div class="span-2">
@@ -479,6 +496,7 @@ Seu conteúdo em Markdown aqui...
                 <div class="progress-track">
                     <div id="progress-bar" class="progress-fill" style="width: 0%"></div>
                 </div>
+                <div id="diagram-warnings" class="hidden" style="margin-top: var(--space-3); font-size: 0.8125rem; color: var(--danger, #c0392b);"></div>
             </div>
 
             <!-- Action Buttons -->
@@ -513,16 +531,19 @@ Seu conteúdo em Markdown aqui...
                 <!-- Estado 1: prévia ao vivo da capa (antes de gerar) -->
                 <div id="cover-preview">
                     <div class="a4">
+                        <div class="pv-band-mask"></div>
+                        <div class="pv-title" id="pv-title">Relatório</div>
                         <div class="pv-head">
                             <div class="pv-sub" id="pv-sub"></div>
                             <div class="pv-desc" id="pv-desc"></div>
                         </div>
                         <div class="pv-prep">
+                            <div class="pv-prep-label">Preparado por:</div>
                             <div class="pv-nome" id="pv-nome"></div>
                             <div class="pv-contact" id="pv-email"></div>
                             <div class="pv-contact" id="pv-phone"></div>
                         </div>
-                        <div class="pv-date" id="pv-data"></div>
+                        <div class="pv-date"><span class="pv-date-label">Data:</span> <span id="pv-data"></span></div>
                     </div>
                     <div class="preview-cap"><span class="live-dot"></span>atualiza enquanto você edita</div>
                 </div>
@@ -753,8 +774,78 @@ Seu conteúdo em Markdown aqui...
             meetingFileInput.addEventListener('change', () => { if (meetingFileInput.files[0]) setMeetingFile(meetingFileInput.files[0]); });
             removeMeetingFileBtn.addEventListener('click', (e) => { e.stopPropagation(); resetAll(); });
 
+            // ── Mermaid (client-side) ──
+            // Blocos ```mermaid viram SVG (data-URI) antes do upload; servidor/WeasyPrint
+            // nem sabem que existiu Mermaid. Lazy: só importa a lib se houver bloco.
+            // Erro de sintaxe ou falha de CDN => avisa e mantém o bloco como código.
+            let _mermaid = null;
+            async function loadMermaid() {
+                if (_mermaid) return _mermaid;
+                const mod = await import('https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs');
+                const mermaid = mod.default;
+                mermaid.initialize({
+                    startOnLoad: false,
+                    securityLevel: 'strict',
+                    htmlLabels: false,  // topo E flowchart: senão sobra <foreignObject> (WeasyPrint não renderiza)
+                    flowchart: { htmlLabels: false },  // htmlLabels:false => texto vira <text> SVG (WeasyPrint suporta)
+                    theme: 'base',
+                    themeVariables: {
+                        primaryColor: '#b5ff81',
+                        primaryBorderColor: '#90cc67',
+                        primaryTextColor: '#141414',
+                        lineColor: '#141414',
+                        secondaryColor: '#f7fff2',
+                        tertiaryColor: '#ffffff',
+                    },
+                });
+                _mermaid = mermaid;
+                return mermaid;
+            }
+
+            function showDiagramWarnings(msgs) {
+                const box = document.getElementById('diagram-warnings');
+                if (!box) return;
+                if (!msgs.length) { box.classList.add('hidden'); box.innerHTML = ''; return; }
+                box.innerHTML = msgs.map(m => '⚠ ' + m).join('<br>');
+                box.classList.remove('hidden');
+            }
+
+            async function renderMermaidInMarkdown(md) {
+                showDiagramWarnings([]);  // limpa avisos de execuções anteriores
+                const FENCE = /^```mermaid\s*\n([\s\S]*?)\n```$/gm;
+                if (!FENCE.test(md)) return md;
+                FENCE.lastIndex = 0;
+
+                let mermaid;
+                try {
+                    mermaid = await loadMermaid();
+                } catch (e) {
+                    showDiagramWarnings(['Não foi possível carregar o renderizador de diagramas — diagramas saem como código.']);
+                    return md;
+                }
+
+                const blocks = [];
+                let m;
+                while ((m = FENCE.exec(md)) !== null) blocks.push({ full: m[0], code: m[1] });
+
+                const warnings = [];
+                let out = md, idx = 0;
+                for (const b of blocks) {
+                    idx++;
+                    try {
+                        const { svg } = await mermaid.render('mmd_' + idx + '_' + Date.now(), b.code);
+                        const dataUri = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)));
+                        out = out.replace(b.full, '![diagrama](' + dataUri + ')');
+                    } catch (e) {
+                        warnings.push('Diagrama ' + idx + ' tem erro de sintaxe — mantido como código.');
+                    }
+                }
+                showDiagramWarnings(warnings);
+                return out;
+            }
+
             // Convert
-            convertBtn.addEventListener('click', () => {
+            convertBtn.addEventListener('click', async () => {
                 const hasFile = currentInputMode === 'file' && selectedFile;
                 const hasText = currentInputMode === 'text' && markdownText.value.trim();
                 const hasMeeting = currentInputMode === 'meeting' && selectedMeetingFile;
@@ -768,13 +859,15 @@ Seu conteúdo em Markdown aqui...
                 const form = new FormData();
                 form.append('session_id', sessionId);
 
-                if (currentInputMode === 'file') {
+                if (currentInputMode === 'file' || currentInputMode === 'text') {
+                    progressText.textContent = 'Renderizando diagramas...';
+                    const fileName = currentInputMode === 'file'
+                        ? (selectedFile.name.replace(/\.[^/.]+$/, '') || 'documento') + '.md'
+                        : 'documento.md';
+                    const raw = await getDocumentText();
+                    const transformed = await renderMermaidInMarkdown(raw);
                     progressText.textContent = 'Gerando PDF...';
-                    form.append('file', selectedFile);
-                } else if (currentInputMode === 'text') {
-                    progressText.textContent = 'Gerando PDF...';
-                    const textBlob = new Blob([markdownText.value], { type: 'text/markdown' });
-                    form.append('file', textBlob, 'documento.md');
+                    form.append('file', new Blob([transformed], { type: 'text/markdown' }), fileName);
                 } else if (currentInputMode === 'meeting') {
                     progressText.textContent = 'Iniciando processamento...';
                     form.append('meeting_file', selectedMeetingFile);
@@ -802,6 +895,7 @@ Seu conteúdo em Markdown aqui...
                 form.append('cover_top_site', getVal('cover_top_site', ''));
                 form.append('cover_rep_label', getVal('cover_rep_label', ''));
                 form.append('cover_rep_nome', getVal('cover_rep_nome', ''));
+                form.append('cover_titulo_principal', getVal('cover_titulo_principal', ''));
                 form.append('cover_subtitulo', getVal('cover_subtitulo', ''));
                 form.append('cover_descricao', getVal('cover_descricao', ''));
                 form.append('cover_prep_nome', getVal('cover_prep_nome', ''));
@@ -925,8 +1019,10 @@ Seu conteúdo em Markdown aqui...
                             setGenStatus(data.error || 'Não foi possível gerar.', false);
                             return;
                         }
+                        const title = document.getElementById('cover_titulo_principal');
                         const sub = document.getElementById('cover_subtitulo');
                         const desc = document.getElementById('cover_descricao');
+                        if (title && data.titulo) title.value = data.titulo;
                         if (sub && data.subtitulo) sub.value = data.subtitulo;
                         if (desc && data.descricao) desc.value = data.descricao;
                         if (typeof updatePreview === 'function') updatePreview();
@@ -1082,6 +1178,7 @@ Seu conteúdo em Markdown aqui...
                 if (el) el.textContent = val || '';
             }
             function updatePreview() {
+                setPreviewText('pv-title', getVal('cover_titulo_principal') || 'Relatório');
                 setPreviewText('pv-sub', getVal('cover_subtitulo'));
                 setPreviewText('pv-desc', getVal('cover_descricao'));
                 setPreviewText('pv-nome', getVal('cover_prep_nome'));
@@ -1089,7 +1186,7 @@ Seu conteúdo em Markdown aqui...
                 setPreviewText('pv-phone', getVal('cover_prep_phone'));
                 setPreviewText('pv-data', fmtPreviewDate(getVal('cover_data')));
             }
-            ['cover_subtitulo','cover_descricao','cover_data'].forEach(id => {
+            ['cover_titulo_principal','cover_subtitulo','cover_descricao','cover_data'].forEach(id => {
                 const el = document.getElementById(id);
                 if (el) el.addEventListener('input', updatePreview);
             });

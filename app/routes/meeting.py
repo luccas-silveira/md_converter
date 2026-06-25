@@ -161,6 +161,7 @@ def process_meeting():
             'topo_direito_site': request.form.get('cover_top_site', ''),
             'representante_label': request.form.get('cover_rep_label', ''),
             'representante_nome': request.form.get('cover_rep_nome', ''),
+            'titulo_principal': request.form.get('cover_titulo_principal', '') or 'Resumo',
             'subtitulo': meeting_title,
             'descricao': f"Reunião realizada em {meeting_date}" if meeting_date else "Resumo de reunião",
             'preparado_nome': request.form.get('cover_prep_nome', ''),
