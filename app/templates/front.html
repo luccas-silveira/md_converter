@@ -288,7 +288,8 @@
                     </div>
 
                     <!-- File Selected State -->
-                    <div id="upload-selected" class="hidden flex flex-col items-center">
+                    <!-- z-index acima do input absoluto inset-0, senão o input intercepta o clique no X -->
+                    <div id="upload-selected" class="hidden flex flex-col items-center" style="position: relative; z-index: 1;">
                         <div class="icon-circle" style="background: var(--green-400); margin-bottom: var(--space-4);">
                             <svg class="w-7 h-7" style="color: var(--neutral-900);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
@@ -358,7 +359,7 @@ Seu conteúdo em Markdown aqui...
                             </div>
 
                             <!-- File Selected State -->
-                            <div id="meeting-upload-selected" class="hidden flex flex-col items-center">
+                            <div id="meeting-upload-selected" class="hidden flex flex-col items-center" style="position: relative; z-index: 1;">
                                 <div class="icon-circle-sm" style="background: var(--green-400); margin-bottom: var(--space-3);">
                                     <svg class="w-5 h-5" style="color: var(--neutral-900);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
@@ -656,6 +657,13 @@ Seu conteúdo em Markdown aqui...
                 meetingParticipants.value = '';
                 meetingDate.value = '';
                 meetingTitle.value = '';
+                // Limpa campos de capa específicos do documento (título volta ao default).
+                const tituloEl = document.getElementById('cover_titulo_principal');
+                if (tituloEl) tituloEl.value = 'Relatório';
+                const subEl = document.getElementById('cover_subtitulo');
+                if (subEl) subEl.value = '';
+                const descEl = document.getElementById('cover_descricao');
+                if (descEl) descEl.value = '';
                 if (coverForm) coverForm.classList.add('hidden');
                 progressSection.classList.add('hidden');
                 successButtons.classList.add('hidden');
