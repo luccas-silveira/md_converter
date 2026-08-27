@@ -1,7 +1,7 @@
 """
 Rota opcional para gerar textos da capa (subtítulo e descrição) com IA.
 
-Usa a API da DeepSeek (compatível com o SDK da OpenAI). É opt-in: o frontend
+Usa a API da OpenAI. É opt-in: o frontend
 só chama este endpoint quando o usuário clica em "Gerar com IA". A conversão
 normal (`/convert-md`) não depende disto.
 """
@@ -22,15 +22,15 @@ APP_ROOT = Path(__file__).resolve().parent.parent.parent
 # Limite de contexto: documento inteiro até este teto (protege o contexto do modelo).
 MAX_DOC_CHARS = 50_000
 
-DEEPSEEK_MODEL = os.getenv('DEEPSEEK_MODEL', 'deepseek-chat')
+COVER_AI_MODEL = os.getenv('COVER_AI_MODEL', 'gpt-4.1-mini')
 
 
 @cover_ai_bp.route("/suggest-cover", methods=["POST"])
 def suggest_cover():
     """Recebe o texto do documento e devolve {subtitulo, descricao} gerados por IA."""
-    api_key = os.getenv('DEEPSEEK_API_KEY')
+    api_key = os.getenv('OPENAI_API_KEY')
     if not api_key:
-        return jsonify({"error": "IA indisponível: DEEPSEEK_API_KEY não configurada."}), 503
+        return jsonify({"error": "IA indisponível: OPENAI_API_KEY não configurada."}), 503
 
     document = (request.form.get('document') or '').strip()
     if not document:
@@ -40,9 +40,9 @@ def suggest_cover():
         prompt_template = (APP_ROOT / "prompts" / "prompt_capa.md").read_text(encoding="utf-8")
         prompt = prompt_template.replace('<<DOCUMENTO>>', document[:MAX_DOC_CHARS])
 
-        client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com", timeout=30)
+        client = OpenAI(api_key=api_key, timeout=30)
         response = client.chat.completions.create(
-            model=DEEPSEEK_MODEL,
+            model=COVER_AI_MODEL,
             messages=[{"role": "user", "content": prompt}],
             response_format={"type": "json_object"},
             max_tokens=500,
