@@ -348,6 +348,7 @@ def md_to_pdf(md_file_path, pdf_file_path=None, css_style=None, logo_path=None, 
 
     img {
         max-width: 100%;
+        max-height: 235mm; /* altura útil da página; SVG alto (mermaid) não é fatiado, só encolhido */
         height: auto;
         display: block;
         margin: 16px auto;
