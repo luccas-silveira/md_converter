@@ -2,7 +2,7 @@
 Rotas para conversão de Markdown para PDF
 """
 
-from flask import Blueprint, request, send_file, abort, jsonify, current_app
+from flask import Blueprint, request, send_file, send_from_directory, abort, jsonify, current_app
 from pathlib import Path
 import tempfile
 import traceback
@@ -10,7 +10,7 @@ import logging
 import uuid
 from werkzeug.utils import secure_filename
 
-from app.utils.md_to_pdf import md_to_pdf
+from app.utils.md_to_pdf import md_to_pdf, build_cover_html, COVER_CSS, font_faces_css
 from app.routes.progress import update_progress
 from app.utils.file_security import sanitize_filename
 from app.utils.image_check import check_and_placeholder_images
@@ -20,6 +20,37 @@ logger = logging.getLogger(__name__)
 
 # Get application root
 APP_ROOT = Path(__file__).resolve().parent.parent.parent
+FONTS_DIR = APP_ROOT / "assets" / "fonts"
+
+
+def cover_data_from(src):
+    """Campos cover_* do front (form do POST ou query do preview) → cover_data do md_to_pdf."""
+    return {
+        'topo_direito_email': src.get('cover_top_email', ''),
+        'topo_direito_site': src.get('cover_top_site', ''),
+        'representante_label': src.get('cover_rep_label', ''),
+        'representante_nome': src.get('cover_rep_nome', ''),
+        'titulo_principal': src.get('cover_titulo_principal', ''),
+        'subtitulo': src.get('cover_subtitulo', ''),
+        'descricao': src.get('cover_descricao', ''),
+        'preparado_nome': src.get('cover_prep_nome', ''),
+        'preparado_email': src.get('cover_prep_email', ''),
+        'preparado_phone': src.get('cover_prep_phone', ''),
+        'data': src.get('cover_data', ''),
+    }
+
+
+@conversion_bp.route("/cover-preview")
+def cover_preview():
+    """Capa em HTML com o mesmo CSS/markup do PDF, para a pré-visualização do front."""
+    font_css, _ = font_faces_css(FONTS_DIR, 'cover-font/')
+    return (f"<!DOCTYPE html><html><head><meta charset='UTF-8'><style>{font_css}{COVER_CSS}"
+            f"html,body{{margin:0;overflow:hidden}}</style></head><body>{build_cover_html(cover_data_from(request.args))}</body></html>")
+
+
+@conversion_bp.route("/cover-font/<path:name>")
+def cover_font(name):
+    return send_from_directory(FONTS_DIR, name)
 
 
 @conversion_bp.route("/convert-md", methods=["POST"])
@@ -58,19 +89,7 @@ def convert_md():
         update_progress(session_id, 25, "Preparando configurações...")
 
         # Dados da capa vindos do formulário do front-end
-        cover_data = {
-            'topo_direito_email': request.form.get('cover_top_email', ''),
-            'topo_direito_site': request.form.get('cover_top_site', ''),
-            'representante_label': request.form.get('cover_rep_label', ''),
-            'representante_nome': request.form.get('cover_rep_nome', ''),
-            'titulo_principal': request.form.get('cover_titulo_principal', ''),
-            'subtitulo': request.form.get('cover_subtitulo', ''),
-            'descricao': request.form.get('cover_descricao', ''),
-            'preparado_nome': request.form.get('cover_prep_nome', ''),
-            'preparado_email': request.form.get('cover_prep_email', ''),
-            'preparado_phone': request.form.get('cover_prep_phone', ''),
-            'data': request.form.get('cover_data', ''),
-        }
+        cover_data = cover_data_from(request.form)
 
         logger.info(f"Cover data: {cover_data}")
 

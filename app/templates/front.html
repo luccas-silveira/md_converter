@@ -197,39 +197,13 @@
             box-shadow: 0 24px 60px rgba(20,20,20,.10), 0 8px 24px rgba(20,20,20,.06);
         }
         .a4 {
-            container-type: inline-size;
             aspect-ratio: 210 / 297; width: 100%; position: relative; overflow: hidden;
-            border-radius: 8px; border: 1px solid var(--neutral-100);
-            background: #fff url('{{ url_for('static', filename='img/cover-mockup.jpg') }}') center / cover no-repeat;
+            border-radius: 8px; border: 1px solid var(--neutral-100); background: #fff;
             box-shadow: 0 2px 10px rgba(20,20,20,.05);
         }
-        /* Overlays posicionados em % equivalentes aos mm do md_to_pdf → WYSIWYG */
-        .pv-head { position: absolute; left: 12.4%; top: 42.4%; width: 57.1%; }
-        .pv-sub {
-            font-family: var(--font-display); font-weight: 600; font-size: 2.69cqw;
-            color: #141414; line-height: 1.2; margin: 0; overflow-wrap: break-word;
-        }
-        .pv-desc {
-            font-size: 1.76cqw; color: #5c5c5c; line-height: 1.35; margin: 1.4cqw 0 0 0;
-            overflow-wrap: break-word;
-        }
-        /* repinta a faixa verde por cima do JPG (mesma cor #b5ff81) p/ esconder os
-           rótulos chapados e renderizar o bloco centralizado, igual ao PDF */
-        .pv-band-mask { position: absolute; left: 0; right: 0; top: 74.3%; bottom: 0; background: #b5ff81; }
-        .pv-prep { position: absolute; left: 6.67%; top: 83.5%; width: 43%; }
-        .pv-prep-label { font-weight: 700; font-size: 1.85cqw; color: #141414; }
-        .pv-nome { font-family: var(--font-display); font-weight: 700; font-size: 2.18cqw; color: #141414; margin-top: .7cqw; }
-        .pv-contact { font-size: 1.76cqw; color: #333; margin-top: .6cqw; }
-        .pv-date { position: absolute; left: 50%; top: 83.5%; width: 40%; font-size: 1.85cqw; color: #141414; }
-        .pv-date-label { font-weight: 700; }
-        /* título principal editável: mascara a palavra chapada no JPG e renderiza o título atual */
-        .pv-title {
-            position: absolute; left: 12.8%; top: 31.2%; width: 84%; height: 11.6%;
-            background: #fff; display: flex; align-items: center; overflow: hidden;
-            white-space: nowrap;
-            font-family: var(--font-display); font-weight: 800; color: #141414;
-            font-size: 13cqw; line-height: 1; letter-spacing: -0.02em;
-        }
+        /* capa renderizada pelo servidor com o mesmo CSS/markup do PDF, em tamanho A4
+           real e reduzida por JS para caber na coluna */
+        #cover-frame { width: 210mm; height: 297mm; border: 0; transform-origin: 0 0; display: block; }
         .preview-cap { text-align: center; font-size: 11px; color: var(--text-tertiary); margin-top: 14px; letter-spacing: .04em; }
         #pdf-preview { display: block; width: 100%; height: calc(100vh - 150px); min-height: 540px; border: 0; border-radius: 8px; background: var(--neutral-50); }
         #pdf-preview.hidden { display: none; }
@@ -531,21 +505,7 @@ Seu conteúdo em Markdown aqui...
             <div class="preview-frame">
                 <!-- Estado 1: prévia ao vivo da capa (antes de gerar) -->
                 <div id="cover-preview">
-                    <div class="a4">
-                        <div class="pv-band-mask"></div>
-                        <div class="pv-title" id="pv-title">Relatório</div>
-                        <div class="pv-head">
-                            <div class="pv-sub" id="pv-sub"></div>
-                            <div class="pv-desc" id="pv-desc"></div>
-                        </div>
-                        <div class="pv-prep">
-                            <div class="pv-prep-label">Preparado por:</div>
-                            <div class="pv-nome" id="pv-nome"></div>
-                            <div class="pv-contact" id="pv-email"></div>
-                            <div class="pv-contact" id="pv-phone"></div>
-                        </div>
-                        <div class="pv-date"><span class="pv-date-label">Data:</span> <span id="pv-data"></span></div>
-                    </div>
+                    <div class="a4"><iframe id="cover-frame" title="Capa" tabindex="-1"></iframe></div>
                     <div class="preview-cap"><span class="live-dot"></span>atualiza enquanto você edita</div>
                 </div>
                 <!-- Estado 2: PDF gerado renderizado inline (após gerar) -->
@@ -1176,25 +1136,33 @@ Seu conteúdo em Markdown aqui...
             if (addProfileBtn) addProfileBtn.addEventListener('click', addProfile);
 
             // ── Pré-visualização ao vivo da capa (espelha posições do md_to_pdf) ──
-            function fmtPreviewDate(v) {
-                if (!v) return '';
-                const p = v.split('-');
-                return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : v;
-            }
-            function setPreviewText(id, val) {
-                const el = document.getElementById(id);
-                if (el) el.textContent = val || '';
-            }
+            const COVER_FIELDS = ['cover_top_email','cover_top_site','cover_rep_label','cover_rep_nome',
+                'cover_titulo_principal','cover_subtitulo','cover_descricao',
+                'cover_prep_nome','cover_prep_email','cover_prep_phone','cover_data'];
+            const coverFrame = document.getElementById('cover-frame');
+            let previewTimer = null, previewSeq = 0;
             function updatePreview() {
-                setPreviewText('pv-title', getVal('cover_titulo_principal') || 'Relatório');
-                setPreviewText('pv-sub', getVal('cover_subtitulo'));
-                setPreviewText('pv-desc', getVal('cover_descricao'));
-                setPreviewText('pv-nome', getVal('cover_prep_nome'));
-                setPreviewText('pv-email', getVal('cover_prep_email'));
-                setPreviewText('pv-phone', getVal('cover_prep_phone'));
-                setPreviewText('pv-data', fmtPreviewDate(getVal('cover_data')));
+                clearTimeout(previewTimer);
+                previewTimer = setTimeout(async () => {
+                    const seq = ++previewSeq;
+                    const qs = new URLSearchParams(COVER_FIELDS.map(id => [id, getVal(id, '')]));
+                    try {
+                        const html = await (await fetch('cover-preview?' + qs)).text();
+                        if (seq !== previewSeq) return;
+                        // troca só o corpo depois da 1ª carga: sem piscar a cada tecla
+                        const doc = coverFrame.contentDocument;
+                        if (doc && doc.querySelector('.cover-page')) {
+                            doc.body.innerHTML = new DOMParser().parseFromString(html, 'text/html').body.innerHTML;
+                        } else {
+                            coverFrame.srcdoc = html;
+                        }
+                    } catch (e) { /* preview é best-effort */ }
+                }, 150);
             }
-            ['cover_titulo_principal','cover_subtitulo','cover_descricao','cover_data'].forEach(id => {
+            new ResizeObserver(() => {
+                coverFrame.style.transform = `scale(${coverFrame.parentElement.clientWidth / coverFrame.offsetWidth})`;
+            }).observe(coverFrame.parentElement);
+            COVER_FIELDS.forEach(id => {
                 const el = document.getElementById(id);
                 if (el) el.addEventListener('input', updatePreview);
             });
