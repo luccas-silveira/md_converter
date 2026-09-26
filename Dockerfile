@@ -12,6 +12,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libffi-dev \
     shared-mime-info \
     fonts-dejavu-core \
+    fonts-noto-color-emoji \
+    fonts-wqy-microhei \
+    fonts-symbola \
     build-essential \
     pkg-config \
     curl \

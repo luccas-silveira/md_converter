@@ -116,7 +116,10 @@ def convert_md():
             # Checar imagens remotas: URL quebrada vira placeholder no PDF e
             # aviso via SSE (não bloqueia a geração).
             update_progress(session_id, 35, "Verificando imagens...")
-            md_content, broken_urls = check_and_placeholder_images(md_content)
+            checked_md, broken_urls = check_and_placeholder_images(md_content)
+            if checked_md != md_content:
+                with open(md_path, 'w', encoding='utf-8') as f:
+                    f.write(checked_md)
             if broken_urls:
                 for url in broken_urls:
                     logger.warning(f"Imagem indisponível: {url}")
@@ -124,8 +127,6 @@ def convert_md():
                     session_id, 40,
                     f"⚠ {len(broken_urls)} imagem(ns) indisponível(eis) — gerando mesmo assim",
                 )
-                with open(md_path, 'w', encoding='utf-8') as f:
-                    f.write(md_content)
 
             logo_path = None
             if logo_file and logo_file.filename:

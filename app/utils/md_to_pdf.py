@@ -1,5 +1,4 @@
 import html
-import markdown2
 import os
 import re
 from weasyprint import HTML
@@ -92,6 +91,7 @@ COVER_CSS = """
     position: absolute; left: 105mm; top: 248mm; width: 80mm; color: #141414; font-size: 11pt;
 }
 .cover-date .label { font-weight: 700; }
+.ord { font-family: 'Satoshi', -apple-system, sans-serif; }
 """
 
 _FONT_WEIGHTS = {'extralight': 200, 'light': 300, 'regular': 400, 'medium': 500,
@@ -130,15 +130,16 @@ def build_cover_html(cover_data=None):
     # Estáticos do mockup (texto fixo). Coluna direita aceita override do form.
     top_email = html.escape(cd.get('topo_direito_email') or 'contato@zoi.tech')
     top_site = html.escape(cd.get('topo_direito_site') or 'www.zoitech.com.br')
+    rep_label = html.escape(cd.get('representante_label') or 'Representante Técnico')
     rep_nome = html.escape(cd.get('representante_nome') or 'Luccas Silveira')
     # Título principal (wordmark): editável, default "Relatório". 1-2 palavras.
     titulo = (cd.get('titulo_principal') or '').strip() or 'Relatório'
-    titulo_esc = html.escape(titulo)
+    titulo_esc = _ord(html.escape(titulo))
     # ponytail: encolhe a fonte p/ título longo não estourar a largura. ~0.147mm
     # por (char·pt) medido p/ Clash em "Relatório"; teto 65pt, piso 34pt.
     wm_size = max(34, min(65, int(1050 / max(len(titulo), 9))))
     # Dinâmicos (conteúdo deste relatório).
-    subtitulo = html.escape(cd.get('subtitulo', ''))
+    subtitulo = _ord(html.escape(cd.get('subtitulo', '')))
     descricao = html.escape(cd.get('descricao', ''))
     prep_nome = html.escape(cd.get('preparado_nome', ''))
     prep_email = html.escape(cd.get('preparado_email', ''))
@@ -161,7 +162,7 @@ def build_cover_html(cover_data=None):
         <div class="cover-rule"></div>
         <div class="cover-contacts">
             <div class="col"><b>ZOI</b><br>Benjamin Constant 2839<br>Joinville &mdash; SC, Brasil<br>+55 (47) 9 9638-4996</div>
-            <div class="col">{top_email}<br>{top_site}<br><b>Representante Técnico</b><br>{rep_nome}</div>
+            <div class="col">{top_email}<br>{top_site}<br><b>{rep_label}</b><br>{rep_nome}</div>
         </div>
         <div class="cover-sun">{sun_svg}</div>
         <div class="cover-wordmark" style="font-size:{wm_size}pt">{titulo_esc}</div>
@@ -183,29 +184,392 @@ def build_cover_html(cover_data=None):
     return cover_html
 
 
-def normalize_markdown_content(content):
-    """
-    Normaliza o conteúdo markdown para garantir formatação correta.
+# Separadores de linha/página Unicode que o WeasyPrint não aceita no meio do texto
+# (U+2029 derrubava a conversão). Viram quebra de linha comum.
+_LINE_SEPS = re.compile('[  \x0b\x0c\x85]')
+_WIKILINK = re.compile(r'\[\[([^\[\]|\n]+)(?:\|([^\[\]\n]+))?\]\]')
+# "Status: ativo" — rótulo curto e capitalizado no começo da linha
+_PLAIN_LABEL = re.compile(r'^[A-ZÀ-Ý][^\s:]*(?: [^\s:]+){0,2}:(\s|$)')
+# "Expected: …" — rótulo de uma palavra abre linha própria mesmo depois de linha longa
+_ABBREV_END = re.compile(r'\b(?:[A-Z][a-z]{0,3}|art|arts|inc|p|pp)\.$')
+_ONE_WORD_LABEL = re.compile(r'^[A-ZÀ-Ý][\w-]*:(\s|$)')
+# item digitado à mão ("• x", "4. x" que não interrompe parágrafo no CommonMark)
+_ITEM_LINE = re.compile(r'^(?:[•·▪◦‣-]|\d+[.)])\s')
+# ~texto~ (til simples, riscado do GitHub); ~~ o markdown-it já trata
+_SINGLE_TILDE = re.compile(r'(?<![~\w])~(?=\S)([^~\n]*?\S)~(?![~\w])')
+# moldura de desenho ASCII: verticais e cantos (─ sozinho é só separador de comentário)
+_FRAME_CHARS = re.compile('[│┃┌-╋║-╬]')
+_DANGEROUS_URL = re.compile(r'\s*(javascript|vbscript|file|data:text):', re.I)
+_ORDINAL = re.compile('[ºª]')
+_EMOJI = re.compile('[\U0001F000-\U0001FAFF☀-➿⬀-⯿⌀-⏿]'
+                    '[️‍\U0001F3FB-\U0001F3FF\U0001F000-\U0001FAFF☀-➿]*')
 
-    Corrige problemas como:
-    - Títulos sem linha em branco antes
-    - Múltiplos títulos consecutivos
-    """
-    lines = content.split('\n')
-    normalized_lines = []
 
-    for i, line in enumerate(lines):
-        # Se a linha atual é um título (começa com #)
-        if line.strip().startswith('#'):
-            # Se não é a primeira linha e a linha anterior não está vazia
-            if i > 0 and lines[i-1].strip() != '':
-                # Adiciona uma linha em branco antes do título
-                normalized_lines.append('')
-            normalized_lines.append(line)
+def _ord(text):
+    """º/ª na Satoshi: na Clash Display o desenho parece o símbolo de grau."""
+    return _ORDINAL.sub(lambda m: f'<span class="ord">{m.group(0)}</span>', text)
+
+
+def _vis_len(text):
+    """Largura visual aproximada em caracteres (emoji ocupa ~2)."""
+    return len(text) + len(_EMOJI.findall(text))
+
+
+def _split_lines(children):
+    """Linhas visíveis de um parágrafo, separadas pelas quebras simples do md:
+    [(texto, começa_em_negrito, só_link_ou_url)]."""
+    lines, cur = [], []
+    for c in children + [None]:
+        if c is None or c.type in ('softbreak', 'hardbreak'):
+            kinds = [x.type for x in cur if not (x.type == 'text' and not x.content.strip())]
+            text = ''.join(x.content for x in cur if x.type in ('text', 'code_inline')).strip()
+            # "**Rótulo:** valor" / "**Rótulo**: valor" (negrito de ênfase no meio da frase não conta)
+            vis = [x for x in cur if not (x.type == 'text' and not x.content.strip())]
+            bold = False
+            if vis and vis[0].type == 'strong_open':
+                close = next((j for j, x in enumerate(vis) if x.type == 'strong_close'), None)
+                if close is not None:
+                    inner = ''.join(x.content for x in vis[1:close]).strip()
+                    after = vis[close + 1].content.lstrip() if close + 1 < len(vis) and vis[close + 1].type == 'text' else ''
+                    if inner.endswith(':') or after.startswith(':'):
+                        bold = 'colon'
+                    elif inner.endswith('.') and (inner[:1].isupper() or inner[:1].isdigit()):
+                        bold = 'dot'
+                    else:
+                        # só começa em negrito: conta para "sequência de linhas em negrito"
+                        bold = 'plain'
+            only_link = (bool(kinds) and kinds[0] == 'link_open' and kinds[-1] == 'link_close'
+                         and kinds.count('link_open') >= 1 and all(k in ('link_open', 'link_close', 'text', 'image') for k in kinds))
+            # linha inteira em negrito (cabeçalho de metadados) também é rótulo
+            whole = (bool(vis) and vis[0].type == 'strong_open' and vis[-1].type == 'strong_close'
+                     and kinds.count('strong_open') == 1)
+            lines.append((text, 'whole' if whole else bold or '',
+                          only_link or text.startswith(('http://', 'https://'))))
+            cur = []
         else:
-            normalized_lines.append(line)
+            cur.append(c)
+    return lines
 
-    return '\n'.join(normalized_lines)
+
+def _bare(text):
+    """Sem aspas/parênteses de fechamento no fim: 'fim.”' termina em ponto."""
+    return text.rstrip('"”’\')]»')
+
+
+def _hard_breaks(lines):
+    """Para cada quebra simples do parágrafo, True se ela é intencional.
+
+    Por padrão junta, como o GitHub. Mantém a quebra só quando o autor claramente
+    a quis: linhas curtas (endereço, assinatura), linha que é só link, sequência
+    de "Rótulo: valor", ou linha que acabou bem antes da largura das outras.
+
+    ponytail: heurística por comprimento de linha visível; a largura de coluna é
+    a maior linha exceto a última (que pode ser mais curta ou mais longa).
+    """
+    lens = [_vis_len(t) for t, _, _ in lines]
+    width = max(lens[:-1] if len(lens) > 2 else lens)
+    labels = [bold or bool(_PLAIN_LABEL.match(t)) for t, bold, _ in lines]
+    # uma frase por linha (toda linha termina em pontuação): o autor quis as quebras
+    if len(lines) >= 3 and all(_bare(t).endswith(('.', '!', '?')) and not _ABBREV_END.search(_bare(t))
+                               for t, _, _ in lines[:-1]):
+        return [True] * (len(lines) - 1)
+    out = []
+    for k in range(len(lines) - 1):
+        (cur, cur_bold, cur_link), (nxt, nxt_bold, nxt_link) = lines[k], lines[k + 1]
+        fits = lens[k] + 1 + _vis_len(nxt.split(maxsplit=1)[0] if nxt.split() else '')
+        out.append(width < 50
+                   or (cur_link and nxt_link)
+                   or nxt_bold == 'colon'
+                   # "**Cl. 30 — Título.**" / linha toda em negrito: só abre linha se a
+                   # anterior terminou a frase (senão é ênfase caindo no começo da linha)
+                   or (nxt_bold in ('dot', 'whole') and _bare(cur).endswith(('.', '!', '?', ':')))
+                   or (cur_bold == 'whole' and not nxt[:1].islower())
+                   or bool(_ITEM_LINE.match(nxt))
+                   or (bool(_ONE_WORD_LABEL.match(nxt))
+                       and (cur.endswith(('.', '!', '?', ':', ';', ')')) or fits <= 0.8 * width))
+                   or (cur.endswith(':') and fits <= 0.8 * width and not nxt[:1].islower())
+                   or (labels[k] and labels[k + 1])
+                   or fits <= 0.6 * width
+                   or (cur.endswith(('.', ':', ';', '!', '?')) and fits <= 0.8 * width))
+    return out
+
+
+def _tilde_strike(children, Token):
+    """Divide texto com ~x~ em s_open/texto/s_close."""
+    out = []
+    for c in children:
+        if c.type != 'text' or '~' not in c.content:
+            out.append(c)
+            continue
+        pos = 0
+        for m in _SINGLE_TILDE.finditer(c.content):
+            if m.start() > pos:
+                t = Token('text', '', 0); t.content = c.content[pos:m.start()]; out.append(t)
+            out.append(Token('s_open', 's', 1))
+            t = Token('text', '', 0); t.content = m.group(1); out.append(t)
+            out.append(Token('s_close', 's', -1))
+            pos = m.end()
+        if pos == 0:
+            out.append(c)
+        elif pos < len(c.content):
+            t = Token('text', '', 0); t.content = c.content[pos:]; out.append(t)
+    return out
+
+
+def _core_fixes(state):
+    """Pós-parse: quebras de linha intencionais, wikilinks, riscado com ~, títulos
+    vazios, links perigosos, rótulo colado no bloco seguinte, numeração de lista
+    e largura de tabelas."""
+    from markdown_it.token import Token
+    toks = state.tokens
+    table = None
+    for i, tok in enumerate(toks):
+        if tok.type == 'table_open':
+            table, cols = tok, 0
+        elif tok.type == 'th_open':
+            cols += 1
+        elif tok.type == 'thead_close' and table is not None:
+            if cols >= 6:
+                table.attrSet('class', 'wide' if cols < 8 else 'very-wide')
+            table = None
+        elif tok.type == 'ordered_list_open' and tok.attrGet('start'):
+            # WeasyPrint ignora start=; o contador CSS respeita
+            tok.attrSet('style', f"counter-reset: list-item {int(tok.attrGet('start')) - 1}")
+        if tok.type != 'inline':
+            continue
+        prev = toks[i - 1] if i else None
+        tok.children = _tilde_strike(tok.children or [], Token)
+        for child in tok.children:
+            if child.type == 'text':
+                if '[[' in child.content:
+                    child.content = _WIKILINK.sub(lambda m: (m.group(2) or m.group(1)).strip(), child.content)
+                # "R$ 50.000,00" não parte entre o símbolo e o valor
+                child.content = re.sub(r'R\$ (?=\d)', 'R$ ', child.content)
+            if child.type == 'link_open' and _DANGEROUS_URL.match(child.attrGet('href') or ''):
+                del child.attrs['href']  # vira texto, sem link executável no PDF
+        if prev is not None and prev.type == 'paragraph_open':
+            breaks = iter(_hard_breaks(_split_lines(tok.children)))
+            for child in tok.children:
+                if child.type == 'softbreak' and next(breaks, False):
+                    child.type, child.tag = 'hardbreak', 'br'
+                elif child.type == 'hardbreak':
+                    next(breaks, None)
+            classes = []
+            # "Arquivos:" / "**Datas.**": rótulo que apresenta o bloco seguinte
+            if re.search(r':(\*\*|__)?\s*$', tok.content) or re.fullmatch(r'\*\*[^*\n]+\*\*', tok.content.strip()):
+                classes.append('lead-in')
+            if any(c.type == 'image' for c in tok.children):
+                classes.append('has-img')
+            if classes:
+                prev.attrJoin('class', ' '.join(classes))
+    # Título vazio ("## " sem texto) não vira badge verde vazio
+    keep, skip = [], 0
+    for i, tok in enumerate(toks):
+        if skip:
+            skip -= 1
+            continue
+        if tok.type == 'heading_open' and i + 1 < len(toks) and not toks[i + 1].content.strip():
+            skip = 2
+            continue
+        keep.append(tok)
+    state.tokens = keep
+    _unchain_lead_ins(keep)
+    _table_widths(keep)
+
+
+def _unchain_lead_ins(toks):
+    """Rótulo seguido de outro rótulo ("Step 2" + "Run:" + código) não fica preso:
+    só o último da sequência gruda no bloco seguinte. Cadeias de "não quebrar"
+    empurravam três ou quatro blocos juntos e deixavam meia página em branco."""
+    def lead(t):
+        return t.nesting == 1 and 'lead-in' in (t.attrGet('class') or '').split()
+    for i, t in enumerate(toks):
+        if not lead(t):
+            continue
+        close = t.type.replace('_open', '_close')
+        j = next((k for k in range(i + 1, len(toks)) if toks[k].type == close and toks[k].level == t.level), None)
+        if j is not None and j + 1 < len(toks) and lead(toks[j + 1]):
+            rest = [c for c in t.attrGet('class').split() if c != 'lead-in']
+            if rest:
+                t.attrSet('class', ' '.join(rest))
+            else:
+                del t.attrs['class']
+
+
+def _table_widths(toks):
+    """Largura de cada coluna pelo conteúdo, como o layout automático do navegador.
+    O automático do WeasyPrint 60 deixa tabela larga passar da página; aqui a
+    tabela é fixa e as larguras vêm do texto: coluna curta fica estreita, a de
+    texto longo ganha o resto, e nenhuma fica menor que a sua maior palavra. Se
+    as palavras não cabem nem assim, a fonte da tabela diminui.
+
+    ponytail: mede em caracteres, não em pontos (Satoshi ~0.55em, código ~0.66em,
+    cabeçalho em Clash negrito ~0.72em). Refinar com métrica de fonte se preciso.
+    """
+    usable = 440.0  # pt úteis da página (A4 menos margens e padding do corpo)
+    for i, tok in enumerate(toks):
+        if tok.type != 'table_open':
+            continue
+        cls = tok.attrGet('class') or ''
+        scale = 0.78 if 'very-wide' in cls else 0.9 if 'wide' in cls else 1.0
+        longest, widest, heads, col, in_head = {}, {}, [], -1, False
+        for t in toks[i + 1:]:
+            if t.type == 'table_close':
+                break
+            if t.type == 'tr_open':
+                col = -1
+            elif t.type in ('th_open', 'td_open'):
+                col += 1
+                in_head = t.type == 'th_open'
+                if in_head:
+                    heads.append(t)
+            elif t.type == 'inline' and col >= 0:
+                total, word = 0.0, 0.0
+                for c in t.children or []:
+                    if c.type not in ('text', 'code_inline'):
+                        continue
+                    k = 1.3 if in_head else 1.0
+                    total += _vis_len(c.content) * k
+                    # maior trecho sem ponto de quebra; código parte em / e - (onde a
+                    # quebra de linha é permitida; _ e . não são) e token
+                    # acima de 20 caracteres (URL, ID) quebra dentro da célula
+                    splitter = r'[ \t\n]+|(?<=[/\-])' if c.type == 'code_inline' else r'[ \t\n]+'
+                    pad = 2 if c.type == 'code_inline' else 1
+                    cap = 30 if c.type == 'code_inline' else 20
+                    word = max([word] + [min(_vis_len(w), cap) * k + pad for w in re.split(splitter, c.content)])
+                longest[col] = max(longest.get(col, 0), total)
+                widest[col] = max(widest.get(col, 0), word)
+        n = len(heads)
+        if not n:
+            continue
+        mins = [max(widest.get(c, 1), 3) for c in range(n)]
+        maxs = [max(longest.get(c, 1), mins[c]) for c in range(n)]
+        pad_pt = 10 if scale < 1 else 20
+
+        def avail(s):
+            return (usable - pad_pt * n) / (9.24 * 0.6 * s)
+        if sum(mins) > avail(scale):
+            # nem as maiores palavras cabem: fonte menor (piso ~7pt) antes de partir palavra
+            # tabela estreita não encolhe tanto: melhor partir um token longo que ilegível
+            scale = max(0.8 if n < 6 else 0.62, scale * avail(scale) / sum(mins))
+            tok.attrSet('style', f'font-size: {scale:.2f}em')
+            tok.attrSet('class', (cls + ' shrunk').strip())
+        room = avail(scale)
+        if sum(maxs) <= room:
+            chars = [m * room / sum(maxs) for m in maxs]
+        elif sum(mins) >= room:
+            chars = [m * room / sum(mins) for m in mins]
+        else:
+            extra = (room - sum(mins)) / (sum(maxs) - sum(mins))
+            chars = [lo + (hi - lo) * extra for lo, hi in zip(mins, maxs)]
+        pts = [ch * 9.24 * 0.6 * scale + pad_pt for ch in chars]
+        for th, pt in zip(heads, pts):
+            th.attrSet('style', f'width: {100 * pt / sum(pts):.1f}%')
+
+
+def _render_code(self, tokens, idx, options, env):
+    """Bloco de código: cada linha num bloco com recuo pendente, então a continuação
+    de uma linha longa quebra alinhada à indentação dela. Desenho com moldura
+    (┌─┐ │) não quebra: a fonte encolhe até a linha mais longa caber."""
+    tok = tokens[idx]
+    lang = tok.info.strip().split()[0] if tok.info.strip() else ''
+    cls = f' class="language-{html.escape(lang)}"' if lang else ''
+    lines = tok.content.rstrip('\n').expandtabs(4).split('\n')
+    if sum(1 for l in lines if _FRAME_CHARS.search(l)) >= 2:
+        # ~420pt úteis no bloco; DejaVu Sans Mono tem 0.602em por caractere
+        size = max(3.0, min(8.9, 420 / (max(map(_vis_len, lines)) * 0.602)))
+        # não parte só se couber numa página (~650pt úteis); maior que isso, parte
+        keep = '; page-break-inside: avoid' if len(lines) * size * 1.25 < 600 else ''
+        return (f'<pre class="diagram" style="font-size:{size:.2f}pt{keep}"><code{cls}>'
+                f'{html.escape(chr(10).join(lines))}\n</code></pre>\n')
+    spans = []
+    for l in lines:
+        indent = len(l) - len(l.lstrip(' '))
+        text = html.escape(l)
+        first = l.split()[0] if l.split() else ''
+        if indent + len(first) > 60:
+            # recuo + palavra que não cabem na linha: sem espaço inquebrável o recuo
+            # vira uma linha em branco antes da palavra
+            text = ' ' * indent + html.escape(l[indent:])
+        n = indent + 2
+        spans.append(f'<span class="ln"><span class="cl" style="padding-left:{n}ch;text-indent:-{n}ch">{text or " "}</span></span>')
+    # 2 primeiras e 2 últimas linhas em grupos inseparáveis (orphans/widows). O fundo
+    # escuro fica nas linhas, não no <pre>: se a página quebrar no começo do bloco, o
+    # pedaço que sobra é invisível, em vez de uma caixa preta vazia
+    if len(spans) <= 6:
+        groups = [spans]
+    else:
+        groups = [spans[:2]] + [[x] for x in spans[2:-2]] + [spans[-2:]]
+    parts = []
+    for gi, g in enumerate(groups):
+        edge = (' top' if gi == 0 else '') + (' bot' if gi == len(groups) - 1 else '')
+        parts.append(f'<span class="grp{edge}">{"".join(g)}</span>' if edge else g[0])
+    short = ' short' if len(groups) == 1 else ''
+    return f'<pre class="lines{short}"><code{cls}>{"".join(parts)}</code></pre>\n'
+
+
+def _render_code_inline(self, tokens, idx, options, env):
+    """Código inline curto não parte no meio ("--short" / "branch")."""
+    content = tokens[idx].content
+    cls = ' class="nw"' if len(content) <= 40 else ''
+    return f'<code{cls}>{html.escape(content)}</code>'
+
+
+_TASK_INPUT = re.compile(r'<input class="task-list-item-checkbox"([^>]*)>')
+_HEADING = re.compile(r'<h([1-6])([^>]*)>(.*?)</h\1>', re.S)
+_TEXT_NODE = re.compile(r'>([^<]+)<')
+_EMOJI_SP = re.compile(f'({_EMOJI.pattern})( ?)')
+
+
+def _build_markdown():
+    from markdown_it import MarkdownIt
+    from mdit_py_plugins.anchors import anchors_plugin
+    from mdit_py_plugins.footnote import footnote_plugin
+    from mdit_py_plugins.front_matter import front_matter_plugin
+    from mdit_py_plugins.tasklists import tasklists_plugin
+
+    # CommonMark (mesmas regras do GitHub): lista colada no parágrafo, código dentro
+    # de lista, "_ênfase_", numeração inicial de lista. Só aspas curvas; sem troca de
+    # "--" por travessão (quebrava comandos e URLs). URL solta vira link, como no GitHub.
+    md = (MarkdownIt('commonmark', {'html': True, 'typographer': True, 'linkify': True})
+          .enable(['table', 'strikethrough', 'smartquotes', 'linkify'])
+          .use(front_matter_plugin)
+          .use(footnote_plugin)
+          .use(tasklists_plugin)
+          .use(anchors_plugin, max_level=6))
+    # só URL com esquema/www vira link; "DESIGN.md" não é domínio
+    md.linkify.set({'fuzzy_link': False})
+    # Todo link é parseado (senão "[x](javascript:…)" aparece cru); os perigosos
+    # perdem o href em _core_fixes. data: fica: o SVG do Mermaid vem assim do front.
+    md.validateLink = lambda url: True
+    md.core.ruler.push('zoi_fixes', _core_fixes)
+    md.add_render_rule('fence', _render_code)
+    md.add_render_rule('code_block', _render_code)
+    md.add_render_rule('code_inline', _render_code_inline)
+    return md
+
+
+_MD = None
+
+
+def render_markdown(md_content):
+    """Markdown → HTML do corpo do PDF."""
+    global _MD
+    if _MD is None:
+        _MD = _build_markdown()
+    html_out = _MD.render(_LINE_SEPS.sub('\n', md_content))
+    html_out = _HEADING.sub(lambda m: f'<h{m.group(1)}{m.group(2)}>{_ord(m.group(3))}</h{m.group(1)}>', html_out)
+    # emoji em span próprio: o espaço seguinte fica na fonte do texto (na fonte de
+    # emoji ele some e o título sai "🔒SEGUROS")
+    html_out = _TEXT_NODE.sub(
+        lambda m: '>' + _EMOJI_SP.sub(
+            lambda e: f'<span class="emo{" sp" if e.group(2) else ""}">{e.group(1)}</span>', m.group(1)) + '<',
+        html_out)
+    # Checkbox desenhado em CSS: <input> no WeasyPrint vira quadrado preto/caixa de texto
+    return _TASK_INPUT.sub(
+        lambda m: '<span class="task-box">%s</span>' % ('✓' if 'checked' in m.group(1) else ''),
+        html_out)
+
 
 def md_to_pdf(md_file_path, pdf_file_path=None, css_style=None, logo_path=None, base_dir=None, cover_data=None, cover_template_path=None):
     """
@@ -250,23 +614,7 @@ def md_to_pdf(md_file_path, pdf_file_path=None, css_style=None, logo_path=None, 
     with open(md_file_path, 'r', encoding='utf-8') as file:
         md_content = file.read()
 
-    # Normalizar o conteúdo markdown (garantir quebras de linha corretas)
-    md_content = normalize_markdown_content(md_content)
-
-    # Converter Markdown para HTML com extensões úteis
-    html_content = markdown2.markdown(
-        md_content,
-        extras=[
-            'tables',           # Suporte para tabelas
-            'fenced-code-blocks',  # Blocos de código com ```
-            'header-ids',       # IDs automáticos para headers
-            'strike',           # Texto riscado
-            'task_list',        # Listas de tarefas [ ] [x]
-            'footnotes',        # Notas de rodapé
-            'smarty-pants',     # Tipografia inteligente
-            'code-friendly',    # Melhor suporte para código
-        ]
-    )
+    html_content = render_markdown(md_content)
 
     # ── CSS alinhado ao ZOI Design System ──
     # Tokens: --green-400: #b5ff81, --green-500: #90cc67, --green-900: #364c26
@@ -283,7 +631,7 @@ def md_to_pdf(md_file_path, pdf_file_path=None, css_style=None, logo_path=None, 
         @bottom-right {
             content: counter(page);
             color: #808080;
-            font-size: 9px;
+            font-size: 8pt;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         }
     }
@@ -299,6 +647,9 @@ def md_to_pdf(md_file_path, pdf_file_path=None, css_style=None, logo_path=None, 
         padding: 20px;
         font-size: 10.5pt;
     }
+    /* HTML cru no md (ex.: e-mail com largura fixa de 600px) não passa da página */
+    .md-body * { max-width: 100% !important; box-sizing: border-box; }
+
     /* capa sangra até a borda: desfaz o padding do body (senão desce/anda 20px vs preview) */
     .cover-page { margin: -20px 0 0 -20px; }
 
@@ -319,6 +670,8 @@ def md_to_pdf(md_file_path, pdf_file_path=None, css_style=None, logo_path=None, 
         page-break-after: avoid;
     }
 
+    h1 strong, h2 strong, h3 strong, h4 strong, h5 strong, h6 strong { font-weight: inherit; }
+
     h1 { font-size: 1.75em; }
     h2 { font-size: 1.35em; }
     h3 { font-size: 1.15em; }
@@ -332,19 +685,28 @@ def md_to_pdf(md_file_path, pdf_file_path=None, css_style=None, logo_path=None, 
     p {
         margin-top: 0;
         margin-bottom: 12px;
-        orphans: 3;
-        widows: 3;
+        orphans: 2;
+        widows: 2;
     }
 
     strong { color: #141414; }
+    th strong { color: inherit; }  /* cabeçalho é fundo preto */
+
+    /* rótulo "Arquivos:" fica na mesma página que a lista/código que apresenta */
+    p.lead-in { page-break-after: avoid; }
+    /* código não fica sozinho no topo da página longe do texto que o apresenta */
+    li > pre { page-break-before: avoid; }
+    /* "O print da conversa:" + imagem andam juntos */
+    p.has-img { page-break-inside: avoid; }
 
     code {
         background-color: #f7fff2;
-        padding: 2px 6px;
-        border-radius: 4px;
-        font-family: 'Courier New', Courier, monospace;
+        padding: 0 1px;
+        border-radius: 3px;
+        overflow-wrap: anywhere;
+        font-family: 'DejaVu Sans Mono', 'DejaVu Sans', monospace;
         font-size: 0.88em;
-        font-weight: 500;
+        font-weight: normal;
         color: #364c26;
     }
 
@@ -353,15 +715,41 @@ def md_to_pdf(md_file_path, pdf_file_path=None, css_style=None, logo_path=None, 
         color: #b5ff81;
         padding: 16px 20px;
         border-radius: 12px;
-        overflow-x: auto;
+        /* PDF não rola: linha longa quebra dentro do bloco em vez de vazar/cortar */
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
         line-height: 1.5;
         font-size: 0.85em;
         /* Blocos longos (ex.: fluxograma ASCII) quebram entre páginas em vez de
            pular o bloco inteiro e deixar um vão em branco após o título. */
         page-break-inside: auto;
-        orphans: 4;
-        widows: 4;
+        orphans: 2;
+        widows: 2;
     }
+
+    pre .cl { display: block; }
+    /* linhas são blocos: orphans/widows à mão (2 no começo, 1 no fim) */
+    pre.lines { background: transparent; padding: 0; border-radius: 0; }
+    pre .ln { display: block; background: #141414; padding: 0 20px; }
+    pre .grp { display: block; page-break-inside: avoid; background: #141414; }
+    pre .grp.top { padding-top: 16px; border-radius: 12px 12px 0 0; page-break-before: avoid; }
+    pre .grp.bot { padding-bottom: 16px; border-radius: 0 0 12px 12px; }
+    pre .grp.top.bot { border-radius: 12px; }
+    pre.short { page-break-inside: avoid; }
+    .emo.sp { margin-right: 0.3em; }
+    th code { background: transparent; color: inherit; }
+    td code.nw, th code.nw { white-space: normal; overflow-wrap: anywhere; }
+    a:not([href]) { color: inherit; text-decoration: none; }
+    /* "Step 1: …" / "Arquivos:" em item de lista fica com o que vem depois */
+    li > p.lead-in { page-break-after: avoid; }
+    /* ponytail: "Step N" (item de lista) pode ficar no pé da página. Prender a lista
+       ao bloco seguinte faz o WeasyPrint 60 recuar a quebra e deixar até 75% da
+       página em branco; o rótulo solto é o mal menor. */
+    /* "# Título" + "---": a linha não deixa o título sozinho no pé da página */
+    h1 + hr, h2 + hr, h3 + hr { page-break-after: avoid; }
+    code.nw { white-space: nowrap; }
+    a { overflow-wrap: anywhere; }
+    pre.diagram { white-space: pre; overflow-wrap: normal; line-height: 1.25; }
 
     pre code {
         background-color: transparent;
@@ -385,8 +773,8 @@ def md_to_pdf(md_file_path, pdf_file_path=None, css_style=None, logo_path=None, 
         border-collapse: collapse;
         width: 100%;
         margin: 16px 0;
+        /* larguras vêm do conteúdo (_table_widths); fixa para nunca passar da página */
         table-layout: fixed;
-        word-wrap: break-word;
         page-break-inside: auto;
     }
 
@@ -395,8 +783,7 @@ def md_to_pdf(md_file_path, pdf_file_path=None, css_style=None, logo_path=None, 
         border: 1px solid #d0d7de;
         padding: 6px 10px;
         text-align: left;
-        overflow-wrap: break-word;
-        word-break: break-word;
+        overflow-wrap: anywhere;  /* só parte token maior que a coluna (URL, ID) */
         font-size: 0.88em;
     }
 
@@ -411,6 +798,10 @@ def md_to_pdf(md_file_path, pdf_file_path=None, css_style=None, logo_path=None, 
     table tr {
         page-break-inside: avoid;
     }
+
+    table.wide { font-size: 0.9em; }
+    table.very-wide { font-size: 0.78em; }
+    table.wide th, table.wide td, table.very-wide th, table.very-wide td { padding: 4px 5px; }
 
 
     table tr:nth-child(even) {
@@ -454,13 +845,23 @@ def md_to_pdf(md_file_path, pdf_file_path=None, css_style=None, logo_path=None, 
         color: #808080;
     }
 
-    .task-list-item {
-        list-style-type: none;
-        margin-left: -1.5em;
-    }
+    /* caixa no lugar do marcador: texto e continuação alinham com os outros itens */
+    .task-list-item { list-style-type: none; }
 
-    .task-list-item input {
-        margin-right: 0.5em;
+    .task-box {
+        display: inline-block;
+        width: 0.8em;
+        height: 0.8em;
+        line-height: 0.8em;
+        border: 1.2px solid #5c5c5c;
+        border-radius: 3px;
+        margin-left: -1.35em;
+        margin-right: 0.45em;
+        text-align: center;
+        font-size: 0.95em;
+        font-family: 'DejaVu Sans', sans-serif;
+        color: #141414;
+        vertical-align: -0.05em;
     }
 
     /* Rodapé com logo no canto inferior esquerdo */
@@ -511,7 +912,7 @@ def md_to_pdf(md_file_path, pdf_file_path=None, css_style=None, logo_path=None, 
     <body>
         {footer_logo_html}
         {cover_html}
-        {html_content}
+        <div class="md-body">{html_content}</div>
     </body>
     </html>
     """

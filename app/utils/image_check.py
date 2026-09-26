@@ -1,8 +1,9 @@
 """
 Checagem de imagens remotas em Markdown antes de gerar o PDF + guard de SSRF.
 
-- check_and_placeholder_images(): URL de imagem http(s) quebrada/insegura vira
-  placeholder no PDF e é devolvida pra avisar o usuário (ex.: via SSE). Não bloqueia.
+- check_and_placeholder_images(): baixa cada imagem remota uma vez e embute no md;
+  a quebrada/insegura/não-imagem vira placeholder e é devolvida pra avisar o
+  usuário (ex.: via SSE). Não bloqueia.
 - safe_url_fetcher(): fetcher pro WeasyPrint que aplica o mesmo guard ao baixar a
   imagem de verdade no render (o sink real de SSRF).
 
@@ -11,6 +12,7 @@ Guard de SSRF: exige esquema http/https, resolve o host e rejeita IPs internos
 revalida cada hop manualmente. Sem dependência nova — só stdlib.
 """
 
+import base64
 import html
 import ipaddress
 import logging
@@ -19,6 +21,7 @@ import socket
 import urllib.parse
 import urllib.request
 import urllib.error
+from concurrent.futures import ThreadPoolExecutor
 
 logger = logging.getLogger(__name__)
 
@@ -114,25 +117,42 @@ def _safe_open(url, method, range_probe=False):
     raise TooManyRedirects(url)
 
 
-def _http_broken(url):
-    """True se a URL não responder com sucesso OU for insegura (SSRF guard)."""
+def _sniff_image(data):
+    """MIME pelo conteúdo, p/ servidor que manda imagem como octet-stream."""
+    if data.startswith(b'\x89PNG'):
+        return 'image/png'
+    if data.startswith(b'\xff\xd8\xff'):
+        return 'image/jpeg'
+    if data.startswith((b'GIF87a', b'GIF89a')):
+        return 'image/gif'
+    if data[:4] == b'RIFF' and data[8:12] == b'WEBP':
+        return 'image/webp'
+    if b'<svg' in data[:1024]:
+        return 'image/svg+xml'
+    return None
+
+
+def _fetch_image(url):
+    """(bytes, mime) se a URL devolver uma imagem; None se quebrada, insegura
+    (SSRF guard) ou se a resposta não for imagem (ex.: página anti-bot com 202)."""
     try:
+        resp = _safe_open(url, 'GET')
         try:
-            resp = _safe_open(url, 'HEAD')
-        except urllib.error.HTTPError as e:
-            if e.code in (403, 405):  # host não gosta de HEAD — confirma com GET
-                resp = _safe_open(url, 'GET', range_probe=True)
-            else:
-                raise
-        status = resp.status
-        resp.close()
-        return status >= 400
+            data = resp.read(_MAX_BODY + 1)
+            status = resp.status
+            ctype = resp.headers.get('Content-Type', '').split(';')[0].strip().lower()
+        finally:
+            resp.close()
     except (UnsafeURL, TooManyRedirects) as e:
         logger.warning(f"Imagem bloqueada (SSRF guard): {e}")
-        return True
+        return None
     except Exception as e:
         logger.info(f"Imagem inacessível ({url}): {e}")
-        return True
+        return None
+    if status >= 400 or len(data) > _MAX_BODY:
+        return None
+    mime = ctype if ctype.startswith('image/') else _sniff_image(data)
+    return (data, mime) if mime else None
 
 
 def safe_url_fetcher(url):
@@ -165,35 +185,60 @@ def _placeholder(url):
     )
 
 
-def check_and_placeholder_images(md_text, is_broken=None):
-    """Substitui imagens remotas quebradas/inseguras por placeholder.
+# <img src="..."> em HTML cru dentro do md (ex.: e-mail colado)
+_HTML_IMG_RE = re.compile(r'<img\b[^>]*?\bsrc=(["\'])(?P<url>[^"\']+)\1[^>]*>', re.I)
+
+# Cercas de código e código inline: imagem ali é texto, não se toca
+_CODE_RE = re.compile(r'^ {0,3}(`{3,}|~{3,})[^\n]*\n.*?(?:^ {0,3}\1[`~]*[ \t]*$|\Z)|`[^`\n]*`', re.M | re.S)
+
+
+def check_and_placeholder_images(md_text, fetch=None):
+    """Baixa cada imagem remota uma vez (em paralelo) e embute como data-URI; a
+    quebrada/insegura/não-imagem e a local (não veio no upload) viram placeholder.
 
     Args:
         md_text: conteúdo markdown.
-        is_broken: callable(url)->bool. Default = checagem HTTP real (com SSRF guard).
+        fetch: callable(url)->(bytes, mime)|None. Default = GET real com SSRF guard.
 
     Returns:
         (novo_texto, [urls_quebradas])
     """
-    if is_broken is None:
-        is_broken = _http_broken
+    fetch = fetch or _fetch_image
+    code = [m.span() for m in _CODE_RE.finditer(md_text)]
 
-    broken = []
-    cache = {}  # ponytail: dedup por URL; sequencial. Paralelizar se doc tiver muitas imagens.
+    def in_code(pos):
+        return any(a <= pos < b for a, b in code)
 
-    def _sub(m):
+    matches = sorted((m for rx in (_IMG_RE, _HTML_IMG_RE) for m in rx.finditer(md_text)
+                      if not in_code(m.start())), key=lambda m: m.start())
+    remote = list(dict.fromkeys(m.group('url') for m in matches
+                                if m.group('url').lower().startswith(('http://', 'https://'))))
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        fetched = dict(zip(remote, pool.map(fetch, remote)))
+
+    broken, out, last = [], [], 0
+    for m in matches:
         url = m.group('url')
-        if not url.lower().startswith(('http://', 'https://')):
-            return m.group(0)  # imagem local/data-uri: não checa
-        if url not in cache:
-            cache[url] = is_broken(url)
-        if cache[url]:
+        if url.lower().startswith('data:'):
+            continue
+        got = fetched.get(url)
+        if got:
+            data, mime = got
+            uri = f"data:{mime};base64,{base64.b64encode(data).decode()}"
+            if m.re is _HTML_IMG_RE:
+                a, b = m.span('url')
+                repl = m.group(0)[:a - m.start()] + uri + m.group(0)[b - m.start():]
+            else:
+                repl = f"![{m.group('alt')}]({uri})"
+        else:
             if url not in broken:
                 broken.append(url)
-            return _placeholder(url)
-        return m.group(0)
-
-    return _IMG_RE.sub(_sub, md_text), broken
+            repl = _placeholder(url)
+        out.append(md_text[last:m.start()])
+        out.append(repl)
+        last = m.end()
+    out.append(md_text[last:])
+    return ''.join(out), broken
 
 
 if __name__ == '__main__':
@@ -210,21 +255,28 @@ if __name__ == '__main__':
     assert is_safe_url('http://evil.example/x', _resolver=lambda h: ['127.0.0.1']) is False
     assert is_safe_url('http://cdn.example/x', _resolver=lambda h: ['93.184.216.34']) is True
 
-    # Substituição com is_broken injetado (sem rede):
+    # Substituição com fetch injetado (sem rede):
     src = (
         "# Doc\n\n"
         "![ok](https://example.com/a.png)\n\n"
         "![ruim](https://example.com/missing.png)\n\n"
         "![local](imgs/foto.png)\n\n"
-        "![data](data:image/png;base64,AAAA)\n"
+        "![data](data:image/png;base64,AAAA)\n\n"
+        "```\n![cod](https://example.com/missing.png)\n```\n\n"
+        "`![inline](imgs/x.png)`\n"
     )
-    broken_set = {"https://example.com/missing.png"}
-    out, broken = check_and_placeholder_images(src, is_broken=lambda u: u in broken_set)
-    assert broken == ["https://example.com/missing.png"], broken
+    imgs = {"https://example.com/a.png": (b"PNG", "image/png")}
+    out, broken = check_and_placeholder_images(src, fetch=imgs.get)
+    assert broken == ["https://example.com/missing.png", "imgs/foto.png"], broken
+    assert "![ok](data:image/png;base64,UE5H)" in out
     assert "imagem indisponível" in out
-    assert "https://example.com/missing.png" in out
-    assert "![ok](https://example.com/a.png)" in out
-    assert "![local](imgs/foto.png)" in out
     assert "![data](data:image/png;base64,AAAA)" in out
-    assert "![ruim]" not in out
+    assert "![ruim]" not in out and "![local]" not in out
+    assert "```\n![cod](https://example.com/missing.png)\n```" in out
+    assert "`![inline](imgs/x.png)`" in out
+    html_src = '<img width="10" src="https://example.com/a.png"> <img src="https://example.com/missing.png">'
+    out, broken = check_and_placeholder_images(html_src, fetch=imgs.get)
+    assert '<img width="10" src="data:image/png;base64,UE5H">' in out, out
+    assert broken == ["https://example.com/missing.png"] and "imagem indisponível" in out
+    assert _sniff_image(b"\x89PNGxx") == "image/png" and _sniff_image(b"<html>") is None
     print("OK — image_check self-check (incl. SSRF guard) passou")
